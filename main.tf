@@ -1,27 +1,96 @@
-# TODO: insert resources here.
+
 data "azurerm_resource_group" "parent" {
   count = var.location == null ? 1 : 0
   name  = var.resource_group_name
 }
 
-resource "azurerm_TODO_the_resource_for_this_module" "this" {
-  name                = var.name # calling code must supply the name
+resource "azurerm_private_dns_resolver" "this" {
+  name = var.name
+  location = local.location
   resource_group_name = var.resource_group_name
-  location            = coalesce(var.location, local.resource_group_location)
-  # etc
+  virtual_network_id = var.virtual_network_id
 }
+
+resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
+  for_each = var.inbound_endpoints
+  name                    = "${each.key}-dnsResolver-inbound"
+  private_dns_resolver_id = azurerm_private_dns_resolver.this.id
+  location                = local.location
+  ip_configurations {
+    subnet_id = each.value
+  }
+}
+
+resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
+  for_each = var.outbound_endpoints
+  name                    = "${each.value.name}-dnsResolver-outbound"
+  private_dns_resolver_id = azurerm_private_dns_resolver.this.id
+  location                = local.location
+  subnet_id = each.value.subnet_id
+}
+
+locals {
+  forwarding_rulesets = flatten([
+    for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
+      for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
+        outbound_endpoint_name = ob_ep_key
+        name = ruleset.name
+        ruleset = ruleset
+      }
+     ] if outbound_endpoint.forwarding_ruleset != null
+  ])
+
+  forwarding_rules = flatten([
+    for ruleset in local.forwarding_rulesets : [
+      for rule_name, rule in ruleset.ruleset.rules : {
+        outbound_endpoint_name = ruleset.outbound_endpoint_name
+        ruleset_name = ruleset.name
+        rule_name = rule_name
+        domain_name = rule.domain_name
+        state = rule.state
+        destination_ip_addresses = rule.destination_ip_addresses
+      }
+    ]
+  ])
+}
+
+resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
+  for_each = tomap({for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset})
+  name = each.value.name
+  private_dns_resolver_outbound_endpoint_ids = [ azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id ]
+  location = local.location
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
+  for_each = { for rule in local.forwarding_rules : "${rule.outbound_endpoint_name}-${rule.ruleset_name}-${rule.rule_name}" => rule }
+
+  name = each.value.rule_name
+  domain_name = each.value.domain_name
+  dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${each.value.outbound_endpoint_name}-${each.value.ruleset_name}"].id
+
+  dynamic "target_dns_servers" {
+    for_each = each.value.destination_ip_addresses
+    content {
+      ip_address = target_dns_servers.key
+      port = target_dns_servers.value
+    }
+  }
+}
+
+
 
 # required AVM resources interfaces
 resource "azurerm_management_lock" "this" {
   count      = var.lock.kind != "None" ? 1 : 0
   name       = coalesce(var.lock.name, "lock-${var.name}")
-  scope      = azurerm_TODO_resource.this.id
+  scope      = azurerm_private_dns_resolver.this.id
   lock_level = var.lock.kind
 }
 
 resource "azurerm_role_assignment" "this" {
   for_each                               = var.role_assignments
-  scope                                  = azurerm_TODO_resource.this.id
+  scope                                  = azurerm_private_dns_resolver.this.id
   role_definition_id                     = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? each.value.role_definition_id_or_name : null
   role_definition_name                   = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? null : each.value.role_definition_id_or_name
   principal_id                           = each.value.principal_id
