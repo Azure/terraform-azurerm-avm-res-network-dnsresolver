@@ -151,12 +151,13 @@ variable "virtual_network_id" {
 }
 
 variable "inbound_endpoints" {
-  type = map(string)
+  type = map(object({
+    name = string
+    subnet_name = string
+  }))
   default     = {}
   description = <<DESCRIPTION
-A map of subnets for which inbound endpoint will be created.
-- The key is the name for the endpoint
-- The value is the subnet ID
+A map of inbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 DESCRIPTION
 }
 
@@ -173,9 +174,11 @@ DESCRIPTION
 variable "outbound_endpoints" {
   type = map(object({
     name = string
-    subnet_id = string
+    subnet_name = string
     forwarding_ruleset = optional(map(object({
       name = string
+      link_with_outbound_endpoint_virtual_network = optional(bool, true)
+      additional_virtual_network_links = optional(set(string), [])
       rules = optional(map(object({
         name = string
         domain_name = string
@@ -187,7 +190,7 @@ variable "outbound_endpoints" {
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 - `name` - The name for the endpoint
-- `subnet_id` - The subnet ID
+- `subnet_name` - The subnet name from the virtual network provided
 - `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
   - `name` - The name of the forwarding ruleset
   - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
@@ -196,30 +199,41 @@ A map of outbound endpoints to create on this resource. The map key is deliberat
     - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
     - `destination_ip_addresses - a map of string, the key is the IP address and the value is the port
 DESCRIPTION
-# default = {
-#     "outbound1" = {
-#       name = "outbound1"
-#       subnet_id = "subid"
-#       forwarding_ruleset = {
-#         "ruleset1" = {
-#           name = "ruleset1"
-#           rules = {
-#             "rule1" = {
-#               name = "rule1"
-#               domain_name = "example.com"
-#               state = "Enabled"
-#               destination_ip_addresses = {
-#                 "10.1.1.1" = "53"
-#                 "10.1.1.2" = "53"
-#               }
-#             }
-#           }
-#         }
-#       }
-#     }
-#     "outbound2" = {
-#       name = "outbound2"
-#       subnet_id = "subid"
-#     }
-#   }
+ default = {
+    "outbound1" = {
+      name = "outbound1"
+      subnet_name = "sub1"
+      forwarding_ruleset = {
+        "ruleset1" = {
+          name = "ruleset1"
+          link_with_outboutnd_endpoint_virtual_network = true
+          additional_virtual_network_links = ["vnet1", "vnet2"]
+          rules = {
+            "rule1" = {
+              name = "rule1"
+              domain_name = "example.com."
+              state = "Enabled"
+              destination_ip_addresses = {
+                "10.1.1.1" = "53"
+                "10.1.1.2" = "53"
+              }
+            },
+            "rule2" = {
+              name = "rule2"
+              domain_name = "example2.com."
+              state = "Enabled"
+              destination_ip_addresses = {
+                "10.2.2.2" = "53"
+              }
+            }
+
+          }
+        }
+      }
+    }
+    "outbound2" = {
+      name = "outbound2"
+      subnet_name = "sub2"
+    }
+  }
 }

@@ -55,15 +55,20 @@ module "private_resolver" {
     name = "resolver"
     virtual_network_id = azurerm_virtual_network.name.id
     inbound_endpoints = {
-        "inbound-endpoint1" = azurerm_subnet.name.id
+    "inbound1" = {
+        name = "inbound1"
+        subnet_name = azurerm_subnet.name.name
+        
+    }
     }
     outbound_endpoints = {
     "outbound1" = {
       name = "outbound1"
-      subnet_id = azurerm_subnet.out.id
+      subnet_name = azurerm_subnet.out.name      
       forwarding_ruleset = {
         "ruleset1" = {
           name = "ruleset1"
+          additional_virtual_network_links = ["/subscriptions/50828fec-245c-4755-a5d3-de3412c42898/resourceGroups/rg-linuxhost/providers/Microsoft.Network/virtualNetworks/LinuxHost-vnet"]
           rules = {
             "rule1" = {
               name = "rule1"
@@ -89,7 +94,7 @@ module "private_resolver" {
     }
     "outbound2" = {
       name = "outbound2"
-      subnet_id = azurerm_subnet.out2.id
+      subnet_name = azurerm_subnet.out2.name
     }
   }
 }
