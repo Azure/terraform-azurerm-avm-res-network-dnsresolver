@@ -22,7 +22,7 @@ variable "location" {
 
 variable "name" {
   type        = string
-  description = "The name of the this resource."
+  description = "The name of the dns resolver."
   validation {
     condition     = can(regex("^[^#]+$", var.name))
     error_message = "The name must be at least 1 characters long."
@@ -152,7 +152,7 @@ variable "virtual_network_id" {
 
 variable "inbound_endpoints" {
   type = map(object({
-    name = string
+    name = optional(string)
     subnet_name = string
   }))
   default     = {}
@@ -173,14 +173,14 @@ DESCRIPTION
 
 variable "outbound_endpoints" {
   type = map(object({
-    name = string
+    name = optional(string)
     subnet_name = string
     forwarding_ruleset = optional(map(object({
-      name = string
+      name = optional(string)
       link_with_outbound_endpoint_virtual_network = optional(bool, true)
       additional_virtual_network_links = optional(set(string), [])
       rules = optional(map(object({
-        name = string
+        name = optional(string)
         domain_name = string
         state = optional(string, "Enabled")
         destination_ip_addresses = map(string)
