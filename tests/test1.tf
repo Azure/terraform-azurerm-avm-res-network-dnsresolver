@@ -68,7 +68,6 @@ module "private_resolver" {
       forwarding_ruleset = {
         "ruleset1" = {
           name = "ruleset1"
-          additional_virtual_network_links = ["/subscriptions/50828fec-245c-4755-a5d3-de3412c42898/resourceGroups/rg-linuxhost/providers/Microsoft.Network/virtualNetworks/LinuxHost-vnet"]
           rules = {
             "rule1" = {
               name = "rule1"
