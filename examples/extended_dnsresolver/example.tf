@@ -50,7 +50,7 @@ resource "azurerm_subnet" "out2" {
 }
 
 module "private_resolver" {
-    source = "../"
+    source = "../../"
     resource_group_name = azurerm_resource_group.name.name
     name = "resolver"
     virtual_network_id = azurerm_virtual_network.name.id
