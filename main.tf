@@ -8,7 +8,7 @@ resource "azurerm_private_dns_resolver" "this" {
   name = var.name
   location = local.location
   resource_group_name = var.resource_group_name
-  virtual_network_id = var.virtual_network_id
+  virtual_network_id = var.virtual_network_resource_id
 }
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
@@ -17,7 +17,7 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = local.location
   ip_configurations {
-    subnet_id = "${var.virtual_network_id}/subnets/${each.value.subnet_name}"
+    subnet_id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
   }
 }
 
@@ -26,7 +26,7 @@ resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
   name                    = each.value.name == null ? "out-${each.key}-dnsResolver-outbound" : each.value.name
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = local.location
-  subnet_id = "${var.virtual_network_id}/subnets/${each.value.subnet_name}"
+  subnet_id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
 }
 
 locals {
@@ -36,7 +36,7 @@ locals {
         outbound_endpoint_name = ob_ep_key
         name = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
         link_with_outbound_endpoint_virtual_network = ruleset.link_with_outbound_endpoint_virtual_network
-        additional_virtual_network_links = ruleset.additional_virtual_network_links
+        additional_virtual_network_links = ruleset.additional_virtual_network_links_resource_ids
         ruleset = ruleset
       }
      ] if outbound_endpoint.forwarding_ruleset != null
@@ -46,7 +46,7 @@ locals {
     for ruleset in local.forwarding_rulesets : [
       for rule_name, rule in ruleset.ruleset.rules : {
         outbound_endpoint_name = ruleset.outbound_endpoint_name
-        additional_virtual_network_links = ruleset.ruleset.additional_virtual_network_links
+        additional_virtual_network_links = ruleset.ruleset.additional_virtual_network_links_resource_ids
         ruleset_name = ruleset.name
         rule_name = rule_name == null ? "rule-${ruleset.name}-${rule_name}" : rule_name
         domain_name = rule.domain_name
@@ -58,7 +58,7 @@ locals {
 
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
-      for vnet_id in ruleset.additional_virtual_network_links : {
+      for vnet_id in ruleset.additional_virtual_network_links_resource_ids : {
         outbound_endpoint_name  = ruleset.outbound_endpoint_name
         ruleset_name   = ruleset.name
         vnet_id        = vnet_id
@@ -95,7 +95,7 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "deafult" {
   for_each = tomap({for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset if ruleset.link_with_outbound_endpoint_virtual_network == true})
   name = "deafult-${each.value.name}"
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this[each.key].id
-  virtual_network_id = var.virtual_network_id
+  virtual_network_id = var.virtual_network_resource_id
 }
 
 resource "azurerm_private_dns_resolver_virtual_network_link" "additional" {
