@@ -13,7 +13,7 @@ resource "azurerm_private_dns_resolver" "this" {
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
   for_each = {for key,value in var.inbound_endpoints : value.name => value}
-  name                    = "${each.key}-dnsResolver-inbound"
+  name                    = each.value.name == null ? "in-${each.key}-dnsResolver-inbound" : each.value.name
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = local.location
   ip_configurations {
@@ -23,7 +23,7 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
 
 resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
   for_each = {for key,value in var.outbound_endpoints : value.name => value}
-  name                    = "${each.value.name}-dnsResolver-outbound"
+  name                    = each.value.name == null ? "out-${each.key}-dnsResolver-outbound" : each.value.name
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = local.location
   subnet_id = "${var.virtual_network_id}/subnets/${each.value.subnet_name}"
@@ -34,7 +34,7 @@ locals {
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
         outbound_endpoint_name = ob_ep_key
-        name = ruleset.name
+        name = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
         link_with_outbound_endpoint_virtual_network = ruleset.link_with_outbound_endpoint_virtual_network
         additional_virtual_network_links = ruleset.additional_virtual_network_links
         ruleset = ruleset
@@ -48,7 +48,7 @@ locals {
         outbound_endpoint_name = ruleset.outbound_endpoint_name
         additional_virtual_network_links = ruleset.ruleset.additional_virtual_network_links
         ruleset_name = ruleset.name
-        rule_name = rule_name
+        rule_name = rule_name == null ? "rule-${ruleset.name}-${rule_name}" : rule_name
         domain_name = rule.domain_name
         state = rule.state
         destination_ip_addresses = rule.destination_ip_addresses
