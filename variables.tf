@@ -145,7 +145,7 @@ variable "tags" {
   default     = {}
 }
 
-variable "virtual_network_id" {
+variable "virtual_network_resource_id" {
   type        = string
   description = "The ID of the virtual network to deploy the private DNS resolver in."
 }
@@ -178,7 +178,7 @@ variable "outbound_endpoints" {
     forwarding_ruleset = optional(map(object({
       name = optional(string)
       link_with_outbound_endpoint_virtual_network = optional(bool, true)
-      additional_virtual_network_links = optional(set(string), [])
+      additional_virtual_network_links_resource_ids = optional(set(string), [])
       rules = optional(map(object({
         name = optional(string)
         domain_name = string
