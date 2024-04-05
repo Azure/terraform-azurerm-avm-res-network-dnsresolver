@@ -1,7 +1,16 @@
 <!-- BEGIN_TF_DOCS -->
-# terraform-azurerm-avm-res-network-dnsresolver
+# terraform-azurerm-avm-template
 
-AVM module for creating a private DNS resolver in Azure with the ability to create inbound and outbound endpoints, forwarding rulesets, and rules.
+This is a template repo for Terraform Azure Verified Modules.
+
+Things to do:
+
+1. Set up a GitHub repo environment called `test`.
+1. Configure environment protection rule to ensure that approval is required before deploying to this environment.
+1. Create a user-assigned managed identity in your test subscription.
+1. Create a role assignment for the managed identity on your test subscription, use the minimum required role.
+1. Configure federated identity credentials on the user assigned managed identity. Use the GitHub environment.
+1. Search and update TODOs within the code and remove the TODO comments once complete.
 
 > [!IMPORTANT]
 > As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
@@ -142,7 +151,7 @@ Type:
 
 ```hcl
 map(object({
-    name = optional(string)
+    name        = optional(string)
     subnet_name = string
   }))
 ```
@@ -205,16 +214,16 @@ Type:
 
 ```hcl
 map(object({
-    name = optional(string)
+    name        = optional(string)
     subnet_name = string
     forwarding_ruleset = optional(map(object({
-      name = optional(string)
-      link_with_outbound_endpoint_virtual_network = optional(bool, true)
+      name                                          = optional(string)
+      link_with_outbound_endpoint_virtual_network   = optional(bool, true)
       additional_virtual_network_links_resource_ids = optional(set(string), [])
       rules = optional(map(object({
-        name = optional(string)
-        domain_name = string
-        state = optional(string, "Enabled")
+        name                     = optional(string)
+        domain_name              = string
+        state                    = optional(string, "Enabled")
         destination_ip_addresses = map(string)
       })))
     })))
