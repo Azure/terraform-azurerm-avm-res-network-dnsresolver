@@ -1,11 +1,11 @@
-variable "enable_telemetry" {
-  type        = bool
-  default     = true
-  description = <<DESCRIPTION
-This variable controls whether or not telemetry is enabled for the module.
-For more information see <https://aka.ms/avm/telemetryinfo>.
-If it is set to false, then no telemetry will be collected.
-DESCRIPTION
+variable "name" {
+  type        = string
+  description = "The name of the dns resolver."
+
+  validation {
+    condition     = can(regex("^[^#]+$", var.name))
+    error_message = "The name must be at least 1 characters long."
+  }
 }
 
 # This is required for most resource modules
@@ -14,19 +14,9 @@ variable "resource_group_name" {
   description = "The resource group where the resources will be deployed."
 }
 
-variable "location" {
+variable "virtual_network_resource_id" {
   type        = string
-  description = "Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
-  default     = null
-}
-
-variable "name" {
-  type        = string
-  description = "The name of the dns resolver."
-  validation {
-    condition     = can(regex("^[^#]+$", var.name))
-    error_message = "The name must be at least 1 characters long."
-  }
+  description = "The ID of the virtual network to deploy the private DNS resolver in."
 }
 
 # required AVM interfaces
@@ -39,8 +29,8 @@ variable "customer_managed_key" {
     key_version                        = optional(string, null)
     user_assigned_identity_resource_id = optional(string, null)
   })
-  description = "Customer managed keys that should be associated with the resource."
   default     = {}
+  description = "Customer managed keys that should be associated with the resource."
 }
 
 variable "diagnostic_settings" {
@@ -56,22 +46,7 @@ variable "diagnostic_settings" {
     event_hub_name                           = optional(string, null)
     marketplace_partner_resource_id          = optional(string, null)
   }))
-  default  = {}
-  nullable = false
-
-  validation {
-    condition     = alltrue([for _, v in var.diagnostic_settings : contains(["Dedicated", "AzureDiagnostics"], v.log_analytics_destination_type)])
-    error_message = "Log analytics destination type must be one of: 'Dedicated', 'AzureDiagnostics'."
-  }
-  validation {
-    condition = alltrue(
-      [
-        for _, v in var.diagnostic_settings :
-        v.workspace_resource_id != null || v.storage_account_resource_id != null || v.event_hub_authorization_rule_resource_id != null || v.marketplace_partner_resource_id != null
-      ]
-    )
-    error_message = "At least one of `workspace_resource_id`, `storage_account_resource_id`, `marketplace_partner_resource_id`, or `event_hub_authorization_rule_resource_id`, must be set."
-  }
+  default     = {}
   description = <<DESCRIPTION
 A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 
@@ -86,6 +61,48 @@ A map of diagnostic settings to create on the Key Vault. The map key is delibera
 - `event_hub_name` - (Optional) The name of the event hub. If none is specified, the default event hub will be selected.
 - `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic LogsLogs.
 DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition     = alltrue([for _, v in var.diagnostic_settings : contains(["Dedicated", "AzureDiagnostics"], v.log_analytics_destination_type)])
+    error_message = "Log analytics destination type must be one of: 'Dedicated', 'AzureDiagnostics'."
+  }
+  validation {
+    condition = alltrue(
+      [
+        for _, v in var.diagnostic_settings :
+        v.workspace_resource_id != null || v.storage_account_resource_id != null || v.event_hub_authorization_rule_resource_id != null || v.marketplace_partner_resource_id != null
+      ]
+    )
+    error_message = "At least one of `workspace_resource_id`, `storage_account_resource_id`, `marketplace_partner_resource_id`, or `event_hub_authorization_rule_resource_id`, must be set."
+  }
+}
+
+variable "enable_telemetry" {
+  type        = bool
+  default     = true
+  description = <<DESCRIPTION
+This variable controls whether or not telemetry is enabled for the module.
+For more information see <https://aka.ms/avm/telemetryinfo>.
+If it is set to false, then no telemetry will be collected.
+DESCRIPTION
+}
+
+variable "inbound_endpoints" {
+  type = map(object({
+    name        = optional(string)
+    subnet_name = string
+  }))
+  default     = {}
+  description = <<DESCRIPTION
+A map of inbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+DESCRIPTION
+}
+
+variable "location" {
+  type        = string
+  default     = null
+  description = "Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
 }
 
 variable "lock" {
@@ -93,9 +110,10 @@ variable "lock" {
     name = optional(string, null)
     kind = optional(string, "None")
   })
-  description = "The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`."
   default     = {}
+  description = "The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`."
   nullable    = false
+
   validation {
     condition     = contains(["CanNotDelete", "ReadOnly", "None"], var.lock.kind)
     error_message = "The lock level must be one of: 'None', 'CanNotDelete', or 'ReadOnly'."
@@ -108,10 +126,77 @@ variable "managed_identities" {
     system_assigned            = optional(bool, false)
     user_assigned_resource_ids = optional(set(string), [])
   })
-  description = "Managed identities to be created for the resource."
   default     = {}
+  description = "Managed identities to be created for the resource."
 }
 
+variable "outbound_endpoints" {
+  type = map(object({
+    name        = optional(string)
+    subnet_name = string
+    forwarding_ruleset = optional(map(object({
+      name                                          = optional(string)
+      link_with_outbound_endpoint_virtual_network   = optional(bool, true)
+      additional_virtual_network_links_resource_ids = optional(set(string), [])
+      rules = optional(map(object({
+        name                     = optional(string)
+        domain_name              = string
+        state                    = optional(string, "Enabled")
+        destination_ip_addresses = map(string)
+      })))
+    })))
+  }))
+  default = {}
+  # default = {
+  #   "outbound1" = {
+  #     name        = "outbound1"
+  #     subnet_name = "sub1"
+  #     forwarding_ruleset = {
+  #       "ruleset1" = {
+  #         name                                         = "ruleset1"
+  #         link_with_outboutnd_endpoint_virtual_network = true
+  #         additional_virtual_network_links             = ["vnet1", "vnet2"]
+  #         rules = {
+  #           "rule1" = {
+  #             name        = "rule1"
+  #             domain_name = "example.com."
+  #             state       = "Enabled"
+  #             destination_ip_addresses = {
+  #               "10.1.1.1" = "53"
+  #               "10.1.1.2" = "53"
+  #             }
+  #           },
+  #           "rule2" = {
+  #             name        = "rule2"
+  #             domain_name = "example2.com."
+  #             state       = "Enabled"
+  #             destination_ip_addresses = {
+  #               "10.2.2.2" = "53"
+  #             }
+  #           }
+
+  #         }
+  #       }
+  #     }
+  #   }
+  #   "outbound2" = {
+  #     name        = "outbound2"
+  #     subnet_name = "sub2"
+  #   }
+  # }
+  description = <<DESCRIPTION
+A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+- `name` - The name for the endpoint
+- `subnet_name` - The subnet name from the virtual network provided
+- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+  - `name` - The name of the forwarding ruleset
+  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+    - `name` - The name of the forwarding rule
+    - `domain_name` - The domain name to forward
+    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - `destination_ip_addresses - a map of string, the key is the IP address and the value is the port
+DESCRIPTION
+}
 
 variable "role_assignments" {
   type = map(object({
@@ -141,99 +226,6 @@ DESCRIPTION
 # tflint-ignore: terraform_unused_declarations
 variable "tags" {
   type        = map(any)
+  default     = {}
   description = "The map of tags to be applied to the resource"
-  default     = {}
-}
-
-variable "virtual_network_resource_id" {
-  type        = string
-  description = "The ID of the virtual network to deploy the private DNS resolver in."
-}
-
-variable "inbound_endpoints" {
-  type = map(object({
-    name = optional(string)
-    subnet_name = string
-  }))
-  default     = {}
-  description = <<DESCRIPTION
-A map of inbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-DESCRIPTION
-}
-
-# variable "outbound_endpoints" {
-#   type = map(string)
-#   default     = {}
-#   description = <<DESCRIPTION
-# A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-# - The key is the name for the endpoint
-# - The value is the subnet ID
-# DESCRIPTION
-# }
-
-variable "outbound_endpoints" {
-  type = map(object({
-    name = optional(string)
-    subnet_name = string
-    forwarding_ruleset = optional(map(object({
-      name = optional(string)
-      link_with_outbound_endpoint_virtual_network = optional(bool, true)
-      additional_virtual_network_links_resource_ids = optional(set(string), [])
-      rules = optional(map(object({
-        name = optional(string)
-        domain_name = string
-        state = optional(string, "Enabled")
-        destination_ip_addresses = map(string)
-      })))
-    })))
-  }))
-  description = <<DESCRIPTION
-A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `name` - The name for the endpoint
-- `subnet_name` - The subnet name from the virtual network provided
-- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the forwarding ruleset
-  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-    - `name` - The name of the forwarding rule
-    - `domain_name` - The domain name to forward
-    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
-    - `destination_ip_addresses - a map of string, the key is the IP address and the value is the port
-DESCRIPTION
- default = {
-    "outbound1" = {
-      name = "outbound1"
-      subnet_name = "sub1"
-      forwarding_ruleset = {
-        "ruleset1" = {
-          name = "ruleset1"
-          link_with_outboutnd_endpoint_virtual_network = true
-          additional_virtual_network_links = ["vnet1", "vnet2"]
-          rules = {
-            "rule1" = {
-              name = "rule1"
-              domain_name = "example.com."
-              state = "Enabled"
-              destination_ip_addresses = {
-                "10.1.1.1" = "53"
-                "10.1.1.2" = "53"
-              }
-            },
-            "rule2" = {
-              name = "rule2"
-              domain_name = "example2.com."
-              state = "Enabled"
-              destination_ip_addresses = {
-                "10.2.2.2" = "53"
-              }
-            }
-
-          }
-        }
-      }
-    }
-    "outbound2" = {
-      name = "outbound2"
-      subnet_name = "sub2"
-    }
-  }
 }
