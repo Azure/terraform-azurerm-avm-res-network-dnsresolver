@@ -122,6 +122,13 @@ resource "azurerm_management_lock" "this" {
   scope      = azurerm_private_dns_resolver.this.id
 }
 
+resource "azurerm_management_lock" "rulesets" {
+  for_each = {for key,ruleset in azurerm_private_dns_resolver_dns_forwarding_ruleset.this : key => ruleset if var.lock.kind != "None"}
+  lock_level = var.lock.kind
+  name = coalesce(var.lock.name, "lock-${each.key}")
+  scope = each.value.id
+}
+
 resource "azurerm_role_assignment" "dnsresolver" {
   for_each = var.role_assignments
 
@@ -137,21 +144,21 @@ resource "azurerm_role_assignment" "dnsresolver" {
 
 locals {
   ruleset_role_assignments = [
-    for ruleset in local.forwarding_rulesets : [
+    for ruleset_index, ruleset in local.forwarding_rulesets : [
       for role_assignment_key, role_assignment in var.role_assignments : {
-        ruleset_id            = azurerm_private_dns_resolver_dns_forwarding_ruleset.this[ruleset.outbound_endpoint_name].id
+        ruleset_id            = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${ruleset.outbound_endpoint_name}-${ruleset.name}"].id
         role_assignment       = role_assignment
         role_assignment_key   = role_assignment_key
+        composite_key         = "${ruleset_index}-${role_assignment_key}" // Static key combining known values
       }
     ]
   ]
 }
 
-
 resource "azurerm_role_assignment" "rulesets" {
   for_each = {
-    for idx, assignment in flatten(local.ruleset_role_assignments) : 
-    "${assignment.ruleset_id}-${assignment.role_assignment_key}" => assignment
+    for composite_key, assignment in flatten(local.ruleset_role_assignments) : 
+    composite_key => assignment
   }
 
   scope = each.value.ruleset_id
