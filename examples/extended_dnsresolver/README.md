@@ -22,7 +22,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
-  name     = "rg-test-resolver"
+  name     = "rg-test-resolver-extended"
 }
 
 resource "azurerm_virtual_network" "name" {
