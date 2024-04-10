@@ -94,10 +94,10 @@ DESCRIPTION
 
 variable "lock" {
   type = object({
+    kind = string
     name = optional(string, null)
-    kind = optional(string, "None")
   })
-  default     = {}
+  default     = null
   description = "The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`."
 
   validation {
@@ -167,6 +167,6 @@ DESCRIPTION
 # tflint-ignore: terraform_unused_declarations
 variable "tags" {
   type        = map(string)
-  default     = {}
-  description = "The map of tags to be applied to the resource"
+  default     = null
+  description = "(Optional) Tags of the resource."
 }

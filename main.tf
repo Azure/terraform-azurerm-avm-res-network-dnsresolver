@@ -112,7 +112,7 @@ locals {
         ruleset_id          = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${ruleset.outbound_endpoint_name}-${ruleset.name}"].id
         role_assignment     = role_assignment
         role_assignment_key = role_assignment_key
-        composite_key       = "${ruleset_index}-${role_assignment_key}" // Static key combining known values
+        composite_key       = "${ruleset_index}-${role_assignment_key}"
       }
     ]
   ]
