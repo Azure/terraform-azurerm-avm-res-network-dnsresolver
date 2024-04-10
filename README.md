@@ -10,6 +10,16 @@ This is a module for deploying private dns resolver. It can be used to deploy th
 >
 > However, it is important to note that this **DOES NOT** mean that the modules cannot be consumed and utilized. They **CAN** be leveraged in all types of environments (dev, test, prod etc.). Consumers can treat them just like any other IaC module and raise issues or feature requests against them as they learn from the usage of the module. Consumers should also read the release notes for each version, if considering updating to a more recent version of a module to see if there are any considerations or breaking changes etc.
 
+## Features And Notes
+- This module deploys a private dns resolver and optional inbound and outbound endpoints.
+- It also deploys optional forwarding rulesets and rules for outbound endpoints.
+- An existing virtual network with appropriately sized **empty** subnets is required.
+- For information on the Azure Private DNS Resolver service, see [Private DNS Resolver](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview).
+- For information on how to configure subnets for the resolver, see [Inbound Endpoints](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview#inbound-endpoints) and [Outbound Endpoints](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview#outbound-endpoints).
+
+## Feedback
+- Your feedback is welcome! Please raise an issue or feature request on the module's GitHub repository.
+
 <!-- markdownlint-disable MD033 -->
 ## Requirements
 
@@ -72,47 +82,14 @@ Type: `string`
 
 ### <a name="input_virtual_network_resource_id"></a> [virtual\_network\_resource\_id](#input\_virtual\_network\_resource\_id)
 
-Description: The ID of the virtual network to deploy the private DNS resolver in.
+Description: The ID of the virtual network to deploy the inbound and outbound endpoints into. The vnet should have appropriate subnets for the endpoints.  
+For more information on how to configure subnets for inbound and outbounbd endpoints, see the modules readme.
 
 Type: `string`
 
 ## Optional Inputs
 
 The following input variables are optional (have default values):
-
-### <a name="input_diagnostic_settings"></a> [diagnostic\_settings](#input\_diagnostic\_settings)
-
-Description: A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the diagnostic setting. One will be generated if not set, however this will not be unique if you want to create multiple diagnostic setting resources.
-- `log_categories` - (Optional) A set of log categories to send to the log analytics workspace. Defaults to `[]`.
-- `log_groups` - (Optional) A set of log groups to send to the log analytics workspace. Defaults to `["allLogs"]`.
-- `metric_categories` - (Optional) A set of metric categories to send to the log analytics workspace. Defaults to `["AllMetrics"]`.
-- `log_analytics_destination_type` - (Optional) The destination type for the diagnostic setting. Possible values are `Dedicated` and `AzureDiagnostics`. Defaults to `Dedicated`.
-- `workspace_resource_id` - (Optional) The resource ID of the log analytics workspace to send logs and metrics to.
-- `storage_account_resource_id` - (Optional) The resource ID of the storage account to send logs and metrics to.
-- `event_hub_authorization_rule_resource_id` - (Optional) The resource ID of the event hub authorization rule to send logs and metrics to.
-- `event_hub_name` - (Optional) The name of the event hub. If none is specified, the default event hub will be selected.
-- `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic LogsLogs.
-
-Type:
-
-```hcl
-map(object({
-    name                                     = optional(string, null)
-    log_categories                           = optional(set(string), [])
-    log_groups                               = optional(set(string), ["allLogs"])
-    metric_categories                        = optional(set(string), ["AllMetrics"])
-    log_analytics_destination_type           = optional(string, "Dedicated")
-    workspace_resource_id                    = optional(string, null)
-    storage_account_resource_id              = optional(string, null)
-    event_hub_authorization_rule_resource_id = optional(string, null)
-    event_hub_name                           = optional(string, null)
-    marketplace_partner_resource_id          = optional(string, null)
-  }))
-```
-
-Default: `{}`
 
 ### <a name="input_enable_telemetry"></a> [enable\_telemetry](#input\_enable\_telemetry)
 
@@ -128,7 +105,7 @@ Default: `true`
 
 Description: A map of inbound endpoints to create on this resource.   
 Multiple endpoints can be created by providing multiple entries in the map.  
-For each endpoint, the "subnet\_name" is required, it points to a subnet in the virtual network provided in the "virtual\_network\_resource\_id" variable.
+For each endpoint, the `subnet_name` is required, it points to a subnet in the virtual network provided in the "virtual\_network\_resource\_id" variable.
 
 Type:
 
@@ -162,15 +139,15 @@ Default: `null`
 ### <a name="input_outbound_endpoints"></a> [outbound\_endpoints](#input\_outbound\_endpoints)
 
 Description: A map of outbound endpoints to create on this resource.
-- name - (Optional) The name for the endpoint
-- subnet\_name - (Required) The subnet name from the virtual network provided.
-- forwarding\_ruleset - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
-  - name - (Optional) The name of the forwarding ruleset
-  - rules - (Optional) A map of forwarding rules to create on the forwarding ruleset.
-    - name - (Optional) The name of the forwarding rule
-    - domain\_name - (Required) The domain name to forward
-    - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
-    - destination\_ip\_addresses - (Required) a map of string, the key is the IP address and the value is the port
+- `name` - (Optional) The name for the endpoint
+- `subnet_name` - (Required) The subnet name from the virtual network provided.
+- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
+  - `name` - (Optional) The name of the forwarding ruleset
+  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset.
+    - `name` - (Optional) The name of the forwarding rule
+    - `domain_name` - (Required) The domain name to forward
+    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - `destination_ip_addresses` - (Required) a map of string, the key is the IP address and the value is the port
 
 Type:
 

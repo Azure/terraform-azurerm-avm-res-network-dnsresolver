@@ -21,53 +21,12 @@ variable "resource_group_name" {
 
 variable "virtual_network_resource_id" {
   type        = string
-  description = "The ID of the virtual network to deploy the private DNS resolver in."
-}
-
-variable "diagnostic_settings" {
-  type = map(object({
-    name                                     = optional(string, null)
-    log_categories                           = optional(set(string), [])
-    log_groups                               = optional(set(string), ["allLogs"])
-    metric_categories                        = optional(set(string), ["AllMetrics"])
-    log_analytics_destination_type           = optional(string, "Dedicated")
-    workspace_resource_id                    = optional(string, null)
-    storage_account_resource_id              = optional(string, null)
-    event_hub_authorization_rule_resource_id = optional(string, null)
-    event_hub_name                           = optional(string, null)
-    marketplace_partner_resource_id          = optional(string, null)
-  }))
-  default     = {}
   description = <<DESCRIPTION
-A map of diagnostic settings to create on the Key Vault. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-
-- `name` - (Optional) The name of the diagnostic setting. One will be generated if not set, however this will not be unique if you want to create multiple diagnostic setting resources.
-- `log_categories` - (Optional) A set of log categories to send to the log analytics workspace. Defaults to `[]`.
-- `log_groups` - (Optional) A set of log groups to send to the log analytics workspace. Defaults to `["allLogs"]`.
-- `metric_categories` - (Optional) A set of metric categories to send to the log analytics workspace. Defaults to `["AllMetrics"]`.
-- `log_analytics_destination_type` - (Optional) The destination type for the diagnostic setting. Possible values are `Dedicated` and `AzureDiagnostics`. Defaults to `Dedicated`.
-- `workspace_resource_id` - (Optional) The resource ID of the log analytics workspace to send logs and metrics to.
-- `storage_account_resource_id` - (Optional) The resource ID of the storage account to send logs and metrics to.
-- `event_hub_authorization_rule_resource_id` - (Optional) The resource ID of the event hub authorization rule to send logs and metrics to.
-- `event_hub_name` - (Optional) The name of the event hub. If none is specified, the default event hub will be selected.
-- `marketplace_partner_resource_id` - (Optional) The full ARM resource ID of the Marketplace resource to which you would like to send Diagnostic LogsLogs.
+The ID of the virtual network to deploy the inbound and outbound endpoints into. The vnet should have appropriate subnets for the endpoints.
+For more information on how to configure subnets for inbound and outbounbd endpoints, see the modules readme.
 DESCRIPTION
-  nullable    = false
-
-  validation {
-    condition     = alltrue([for _, v in var.diagnostic_settings : contains(["Dedicated", "AzureDiagnostics"], v.log_analytics_destination_type)])
-    error_message = "Log analytics destination type must be one of: 'Dedicated', 'AzureDiagnostics'."
-  }
-  validation {
-    condition = alltrue(
-      [
-        for _, v in var.diagnostic_settings :
-        v.workspace_resource_id != null || v.storage_account_resource_id != null || v.event_hub_authorization_rule_resource_id != null || v.marketplace_partner_resource_id != null
-      ]
-    )
-    error_message = "At least one of `workspace_resource_id`, `storage_account_resource_id`, `marketplace_partner_resource_id`, or `event_hub_authorization_rule_resource_id`, must be set."
-  }
 }
+
 
 variable "enable_telemetry" {
   type        = bool
@@ -88,7 +47,7 @@ variable "inbound_endpoints" {
   description = <<DESCRIPTION
 A map of inbound endpoints to create on this resource. 
 Multiple endpoints can be created by providing multiple entries in the map.
-For each endpoint, the "subnet_name" is required, it points to a subnet in the virtual network provided in the "virtual_network_resource_id" variable.
+For each endpoint, the `subnet_name` is required, it points to a subnet in the virtual network provided in the "virtual_network_resource_id" variable.
 DESCRIPTION
 }
 
@@ -130,15 +89,15 @@ variable "outbound_endpoints" {
   default     = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
-- name - (Optional) The name for the endpoint 
-- subnet_name - (Required) The subnet name from the virtual network provided. 
-- forwarding_ruleset - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
-  - name - (Optional) The name of the forwarding ruleset
-  - rules - (Optional) A map of forwarding rules to create on the forwarding ruleset.
-    - name - (Optional) The name of the forwarding rule
-    - domain_name - (Required) The domain name to forward
-    - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
-    - destination_ip_addresses - (Required) a map of string, the key is the IP address and the value is the port
+- `name` - (Optional) The name for the endpoint 
+- `subnet_name` - (Required) The subnet name from the virtual network provided. 
+- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
+  - `name` - (Optional) The name of the forwarding ruleset
+  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset.
+    - `name` - (Optional) The name of the forwarding rule
+    - `domain_name` - (Required) The domain name to forward
+    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - `destination_ip_addresses` - (Required) a map of string, the key is the IP address and the value is the port
 DESCRIPTION
   nullable    = false
 }
