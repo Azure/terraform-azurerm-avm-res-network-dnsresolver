@@ -77,19 +77,21 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "additional" {
 
 # required AVM resources interfaces
 resource "azurerm_management_lock" "this" {
-  count = var.lock.kind != "None" ? 1 : 0
+  count = var.lock != null ? 1 : 0
 
   lock_level = var.lock.kind
-  name       = coalesce(var.lock.name, "lock-${var.name}")
-  scope      = azurerm_private_dns_resolver.this.id
+  name       = coalesce(var.lock.name, "lock-${var.lock.kind}")
+  scope      = azurerm_MY_RESOURCE.this.id
+  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
 
 resource "azurerm_management_lock" "rulesets" {
-  for_each = { for key, ruleset in azurerm_private_dns_resolver_dns_forwarding_ruleset.this : key => ruleset if var.lock.kind != "None" }
+  for_each = { for key, ruleset in azurerm_private_dns_resolver_dns_forwarding_ruleset.this : key => ruleset if var.lock != null }
 
   lock_level = var.lock.kind
   name       = coalesce(var.lock.name, "lock-${each.key}")
   scope      = each.value.id
+  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
 
 resource "azurerm_role_assignment" "dnsresolver" {
