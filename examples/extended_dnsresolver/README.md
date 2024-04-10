@@ -4,6 +4,17 @@
 This deploys the module in its simplest form.
 
 ```hcl
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    # TODO: Ensure all required providers are listed here.
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">= 3.71.0, < 4.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
 
@@ -108,13 +119,17 @@ module "private_resolver" {
 <!-- markdownlint-disable MD033 -->
 ## Requirements
 
-No requirements.
+The following requirements are needed by this module:
+
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
+
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
 
 ## Providers
 
 The following providers are used by this module:
 
-- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm)
+- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0, < 4.0)
 
 ## Resources
 
