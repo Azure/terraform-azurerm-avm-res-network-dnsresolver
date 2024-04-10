@@ -139,8 +139,8 @@ variable "outbound_endpoints" {
       })))
     })))
   }))
-  nullable = false
-  default = {}
+  nullable    = false
+  default     = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
 - name - (Optional) The name for the endpoint 

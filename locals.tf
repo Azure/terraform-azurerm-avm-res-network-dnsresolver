@@ -11,14 +11,14 @@ locals {
 
 locals {
 
-    forwarding_rulesets = flatten([
+  forwarding_rulesets = flatten([
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
-        outbound_endpoint_name                      = ob_ep_key
-        name                                        = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
-        link_with_outbound_endpoint_virtual_network = ruleset.link_with_outbound_endpoint_virtual_network
-        additional_virtual_network_links_resource_ids            = ruleset.additional_virtual_network_links_resource_ids
-        ruleset                                     = ruleset
+        outbound_endpoint_name                        = ob_ep_key
+        name                                          = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
+        link_with_outbound_endpoint_virtual_network   = ruleset.link_with_outbound_endpoint_virtual_network
+        additional_virtual_network_links_resource_ids = ruleset.additional_virtual_network_links_resource_ids
+        ruleset                                       = ruleset
       }
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
