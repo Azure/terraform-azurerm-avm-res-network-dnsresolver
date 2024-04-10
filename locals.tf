@@ -2,8 +2,8 @@
 # Deafult locals
 
 locals {
-  location                           = var.location != null ? var.location : data.azurerm_resource_group.parent[0].location
-  resource_group_location            = try(data.azurerm_resource_group.parent[0].location, null)
+  location                           = var.location
+  resource_group_location            = var.location
   role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
 
@@ -23,7 +23,6 @@ locals {
       }
     ]
   ])
-
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
       for vnet_id in ruleset.additional_virtual_network_links_resource_ids : {
@@ -33,15 +32,14 @@ locals {
       }
     ]
   ])
-  
   forwarding_rulesets = flatten([
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
-        outbound_endpoint_name                      = ob_ep_key
-        name                                        = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
-        link_with_outbound_endpoint_virtual_network = ruleset.link_with_outbound_endpoint_virtual_network
-        additional_virtual_network_links_resource_ids            = ruleset.additional_virtual_network_links_resource_ids
-        ruleset                                     = ruleset
+        outbound_endpoint_name                        = ob_ep_key
+        name                                          = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
+        link_with_outbound_endpoint_virtual_network   = ruleset.link_with_outbound_endpoint_virtual_network
+        additional_virtual_network_links_resource_ids = ruleset.additional_virtual_network_links_resource_ids
+        ruleset                                       = ruleset
       }
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
