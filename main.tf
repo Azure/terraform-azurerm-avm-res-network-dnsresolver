@@ -1,36 +1,33 @@
 
-data "azurerm_resource_group" "parent" {
-  count = var.location == null ? 1 : 0
-  name = var.resource_group_name
-}
-
 resource "azurerm_private_dns_resolver" "this" {
   location            = local.location
   name                = var.name
   resource_group_name = var.resource_group_name
   virtual_network_id  = var.virtual_network_resource_id
-  tags = var.tags
+  tags                = var.tags
 }
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
   for_each = { for key, value in var.inbound_endpoints : value.name => value }
+
   location                = local.location
   name                    = coalesce(each.value.name, "in-${each.key}-dnsResolver-inbound")
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
+  tags                    = var.tags
 
   ip_configurations {
     subnet_id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
   }
-  tags = var.tags
 }
 
 resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
   for_each = { for key, value in var.outbound_endpoints : value.name => value }
+
   location                = local.location
   name                    = coalesce(each.value.name, "out-${each.key}-dnsResolver-outbound")
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   subnet_id               = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
-  tags = var.tags
+  tags                    = var.tags
 }
 
 
@@ -41,7 +38,7 @@ resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
   name                                       = each.value.name
   private_dns_resolver_outbound_endpoint_ids = [azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id]
   resource_group_name                        = var.resource_group_name
-  tags = var.tags
+  tags                                       = var.tags
 }
 
 resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
@@ -80,18 +77,21 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "additional" {
 
 # required AVM resources interfaces
 resource "azurerm_management_lock" "this" {
-  count = var.lock.kind != "None" ? 1 : 0
+  count = var.lock != null ? 1 : 0
 
   lock_level = var.lock.kind
-  name       = coalesce(var.lock.name, "lock-${var.name}")
+  name       = coalesce(var.lock.name, "lock-${var.lock.kind}")
   scope      = azurerm_private_dns_resolver.this.id
+  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
 
 resource "azurerm_management_lock" "rulesets" {
-  for_each = {for key,ruleset in azurerm_private_dns_resolver_dns_forwarding_ruleset.this : key => ruleset if var.lock.kind != "None"}
+  for_each = { for key, ruleset in azurerm_private_dns_resolver_dns_forwarding_ruleset.this : key => ruleset if var.lock != null }
+
   lock_level = var.lock.kind
-  name = coalesce(var.lock.name, "lock-${each.key}")
-  scope = each.value.id
+  name       = coalesce(var.lock.name, "lock-${each.key}")
+  scope      = each.value.id
+  notes      = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
 }
 
 resource "azurerm_role_assignment" "dnsresolver" {
@@ -111,10 +111,10 @@ locals {
   ruleset_role_assignments = [
     for ruleset_index, ruleset in local.forwarding_rulesets : [
       for role_assignment_key, role_assignment in var.role_assignments : {
-        ruleset_id            = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${ruleset.outbound_endpoint_name}-${ruleset.name}"].id
-        role_assignment       = role_assignment
-        role_assignment_key   = role_assignment_key
-        composite_key         = "${ruleset_index}-${role_assignment_key}" // Static key combining known values
+        ruleset_id          = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${ruleset.outbound_endpoint_name}-${ruleset.name}"].id
+        role_assignment     = role_assignment
+        role_assignment_key = role_assignment_key
+        composite_key       = "${ruleset_index}-${role_assignment_key}"
       }
     ]
   ]
@@ -122,16 +122,16 @@ locals {
 
 resource "azurerm_role_assignment" "rulesets" {
   for_each = {
-    for composite_key, assignment in flatten(local.ruleset_role_assignments) : 
+    for composite_key, assignment in flatten(local.ruleset_role_assignments) :
     composite_key => assignment
   }
 
-  scope = each.value.ruleset_id
-  role_definition_name                   = each.value.role_assignment.role_definition_id_or_name
   principal_id                           = each.value.role_assignment.principal_id
+  scope                                  = each.value.ruleset_id
   condition                              = each.value.role_assignment.condition
   condition_version                      = each.value.role_assignment.condition_version
   delegated_managed_identity_resource_id = each.value.role_assignment.delegated_managed_identity_resource_id
   description                            = each.value.role_assignment.description
+  role_definition_name                   = each.value.role_assignment.role_definition_id_or_name
   skip_service_principal_aad_check       = each.value.role_assignment.skip_service_principal_aad_check
 }

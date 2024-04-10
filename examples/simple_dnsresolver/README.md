@@ -5,13 +5,14 @@ This deploys the module in its simplest form.
 
 ```hcl
 terraform {
+  required_version = ">= 1.5.0"
   required_providers {
+    # TODO: Ensure all required providers are listed here.
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = ">=3.5"
+      version = ">= 3.71.0, < 4.0"
     }
   }
-
 }
 
 provider "azurerm" {
@@ -20,7 +21,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
-  name     = "rg-test-resolver"
+  name     = "rg-test-resolver-simple"
 }
 
 resource "azurerm_virtual_network" "name" {
@@ -46,6 +47,7 @@ module "private_resolver" {
   resource_group_name         = azurerm_resource_group.name.name
   name                        = "resolver"
   virtual_network_resource_id = azurerm_virtual_network.name.id
+  location                    = "northeurope"
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
@@ -60,13 +62,15 @@ module "private_resolver" {
 
 The following requirements are needed by this module:
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>=3.5)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
+
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
 
 ## Providers
 
 The following providers are used by this module:
 
-- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>=3.5)
+- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0, < 4.0)
 
 ## Resources
 

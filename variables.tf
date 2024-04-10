@@ -1,3 +1,8 @@
+variable "location" {
+  type        = string
+  description = "Azure region where the resource should be deployed."
+}
+
 variable "name" {
   type        = string
   description = "The name of the dns resolver."
@@ -17,20 +22,6 @@ variable "resource_group_name" {
 variable "virtual_network_resource_id" {
   type        = string
   description = "The ID of the virtual network to deploy the private DNS resolver in."
-}
-
-# required AVM interfaces
-# remove only if not supported by the resource
-# tflint-ignore: terraform_unused_declarations
-variable "customer_managed_key" {
-  type = object({
-    key_vault_resource_id              = optional(string)
-    key_name                           = optional(string)
-    key_version                        = optional(string, null)
-    user_assigned_identity_resource_id = optional(string, null)
-  })
-  default     = {}
-  description = "Customer managed keys that should be associated with the resource."
 }
 
 variable "diagnostic_settings" {
@@ -101,35 +92,23 @@ For each endpoint, the "subnet_name" is required, it points to a subnet in the v
 DESCRIPTION
 }
 
-variable "location" {
-  type        = string
-  default     = null
-  description = "Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
-}
-
 variable "lock" {
   type = object({
+    kind = string
     name = optional(string, null)
-    kind = optional(string, "None")
   })
-  default     = {}
-  description = "The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`."
-  nullable    = false
+  default     = null
+  description = <<DESCRIPTION
+  Controls the Resource Lock configuration for this resource. The following properties can be specified:
+  
+  - `kind` - (Required) The type of lock. Possible values are `\"CanNotDelete\"` and `\"ReadOnly\"`.
+  - `name` - (Optional) The name of the lock. If not specified, a name will be generated based on the `kind` value. Changing this forces the creation of a new resource.
+  DESCRIPTION
 
   validation {
-    condition     = contains(["CanNotDelete", "ReadOnly", "None"], var.lock.kind)
-    error_message = "The lock level must be one of: 'None', 'CanNotDelete', or 'ReadOnly'."
+    condition     = var.lock != null ? contains(["CanNotDelete", "ReadOnly"], var.lock.kind) : true
+    error_message = "Lock kind must be either `\"CanNotDelete\"` or `\"ReadOnly\"`."
   }
-}
-
-# tflint-ignore: terraform_unused_declarations
-variable "managed_identities" {
-  type = object({
-    system_assigned            = optional(bool, false)
-    user_assigned_resource_ids = optional(set(string), [])
-  })
-  default     = {}
-  description = "Managed identities to be created for the resource."
 }
 
 variable "outbound_endpoints" {
@@ -148,7 +127,7 @@ variable "outbound_endpoints" {
       })))
     })))
   }))
-  default = {}
+  default     = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
 - name - (Optional) The name for the endpoint 
@@ -161,6 +140,7 @@ A map of outbound endpoints to create on this resource.
     - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
     - destination_ip_addresses - (Required) a map of string, the key is the IP address and the value is the port
 DESCRIPTION
+  nullable    = false
 }
 
 variable "role_assignments" {
@@ -174,6 +154,7 @@ variable "role_assignments" {
     delegated_managed_identity_resource_id = optional(string, null)
   }))
   default     = {}
+  nullable    = false
   description = <<DESCRIPTION
 A map of role assignments to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 
@@ -190,7 +171,7 @@ DESCRIPTION
 
 # tflint-ignore: terraform_unused_declarations
 variable "tags" {
-  type        = map(any)
-  default     = {}
-  description = "The map of tags to be applied to the resource"
+  type        = map(string)
+  default     = null
+  description = "(Optional) Tags of the resource."
 }

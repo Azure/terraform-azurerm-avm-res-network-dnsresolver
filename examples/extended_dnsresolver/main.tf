@@ -1,3 +1,14 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    # TODO: Ensure all required providers are listed here.
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">= 3.71.0, < 4.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
 
@@ -5,7 +16,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
-  name     = "rg-test-resolver"
+  name     = "rg-test-resolver-extended"
 }
 
 resource "azurerm_virtual_network" "name" {
@@ -53,6 +64,7 @@ module "private_resolver" {
   resource_group_name         = azurerm_resource_group.name.name
   name                        = "resolver"
   virtual_network_resource_id = azurerm_virtual_network.name.id
+  location                    = "northeurope"
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
