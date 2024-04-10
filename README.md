@@ -1,7 +1,7 @@
 <!-- BEGIN_TF_DOCS -->
-# terraform-azurerm-avm-template
+# terraform-azurerm-avm-res-network-dnsresolver
 
-AVM Module for deploying a private DNS resolver.
+This is a module for deploying private dns resolver. It can be used to deploy the reosolver, inbound endpoints, outbound endpoints, forwarding rulesets and rules.
 
 > [!IMPORTANT]
 > As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
