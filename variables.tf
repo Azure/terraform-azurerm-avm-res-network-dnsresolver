@@ -99,7 +99,6 @@ variable "lock" {
   })
   default     = {}
   description = "The lock level to apply. Default is `None`. Possible values are `None`, `CanNotDelete`, and `ReadOnly`."
-  nullable    = false
 
   validation {
     condition     = contains(["CanNotDelete", "ReadOnly", "None"], var.lock.kind)
@@ -150,6 +149,7 @@ variable "role_assignments" {
     delegated_managed_identity_resource_id = optional(string, null)
   }))
   default     = {}
+  nullable = false
   description = <<DESCRIPTION
 A map of role assignments to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 
@@ -166,7 +166,7 @@ DESCRIPTION
 
 # tflint-ignore: terraform_unused_declarations
 variable "tags" {
-  type        = map(any)
+  type        = map(string)
   default     = {}
   description = "The map of tags to be applied to the resource"
 }
