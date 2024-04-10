@@ -95,7 +95,9 @@ variable "inbound_endpoints" {
   }))
   default     = {}
   description = <<DESCRIPTION
-A map of inbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+A map of inbound endpoints to create on this resource. 
+Multiple endpoints can be created by providing multiple entries in the map.
+For each endpoint, the "subnet_name" is required, it points to a subnet in the virtual network provided in the "virtual_network_resource_id" variable.
 DESCRIPTION
 }
 
@@ -147,54 +149,17 @@ variable "outbound_endpoints" {
     })))
   }))
   default = {}
-  # default = {
-  #   "outbound1" = {
-  #     name        = "outbound1"
-  #     subnet_name = "sub1"
-  #     forwarding_ruleset = {
-  #       "ruleset1" = {
-  #         name                                         = "ruleset1"
-  #         link_with_outboutnd_endpoint_virtual_network = true
-  #         additional_virtual_network_links             = ["vnet1", "vnet2"]
-  #         rules = {
-  #           "rule1" = {
-  #             name        = "rule1"
-  #             domain_name = "example.com."
-  #             state       = "Enabled"
-  #             destination_ip_addresses = {
-  #               "10.1.1.1" = "53"
-  #               "10.1.1.2" = "53"
-  #             }
-  #           },
-  #           "rule2" = {
-  #             name        = "rule2"
-  #             domain_name = "example2.com."
-  #             state       = "Enabled"
-  #             destination_ip_addresses = {
-  #               "10.2.2.2" = "53"
-  #             }
-  #           }
-
-  #         }
-  #       }
-  #     }
-  #   }
-  #   "outbound2" = {
-  #     name        = "outbound2"
-  #     subnet_name = "sub2"
-  #   }
-  # }
   description = <<DESCRIPTION
-A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `name` - The name for the endpoint
-- `subnet_name` - The subnet name from the virtual network provided
-- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the forwarding ruleset
-  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-    - `name` - The name of the forwarding rule
-    - `domain_name` - The domain name to forward
-    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
-    - `destination_ip_addresses - a map of string, the key is the IP address and the value is the port
+A map of outbound endpoints to create on this resource.
+- name - (Optional) The name for the endpoint 
+- subnet_name - (Required) The subnet name from the virtual network provided. 
+- forwarding_ruleset - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
+  - name - (Optional) The name of the forwarding ruleset
+  - rules - (Optional) A map of forwarding rules to create on the forwarding ruleset.
+    - name - (Optional) The name of the forwarding rule
+    - domain_name - (Required) The domain name to forward
+    - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - destination_ip_addresses - (Required) a map of string, the key is the IP address and the value is the port
 DESCRIPTION
 }
 
