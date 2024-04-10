@@ -1,3 +1,8 @@
+################################################################################################################
+####################################### Required Inputs ########################################################
+################################################################################################################
+
+
 variable "name" {
   type        = string
   description = "The name of the dns resolver."
@@ -19,19 +24,14 @@ variable "virtual_network_resource_id" {
   description = "The ID of the virtual network to deploy the private DNS resolver in."
 }
 
+
+################################################################################################################
+####################################### Optional Inputs ########################################################
+################################################################################################################
+
 # required AVM interfaces
 # remove only if not supported by the resource
 # tflint-ignore: terraform_unused_declarations
-variable "customer_managed_key" {
-  type = object({
-    key_vault_resource_id              = optional(string)
-    key_name                           = optional(string)
-    key_version                        = optional(string, null)
-    user_assigned_identity_resource_id = optional(string, null)
-  })
-  default     = {}
-  description = "Customer managed keys that should be associated with the resource."
-}
 
 variable "diagnostic_settings" {
   type = map(object({
@@ -101,6 +101,7 @@ For each endpoint, the "subnet_name" is required, it points to a subnet in the v
 DESCRIPTION
 }
 
+
 variable "location" {
   type        = string
   default     = null
@@ -122,15 +123,6 @@ variable "lock" {
   }
 }
 
-# tflint-ignore: terraform_unused_declarations
-variable "managed_identities" {
-  type = object({
-    system_assigned            = optional(bool, false)
-    user_assigned_resource_ids = optional(set(string), [])
-  })
-  default     = {}
-  description = "Managed identities to be created for the resource."
-}
 
 variable "outbound_endpoints" {
   type = map(object({
@@ -148,6 +140,7 @@ variable "outbound_endpoints" {
       })))
     })))
   }))
+  nullable = false
   default = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
@@ -194,3 +187,6 @@ variable "tags" {
   default     = {}
   description = "The map of tags to be applied to the resource"
 }
+
+
+
