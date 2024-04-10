@@ -3,6 +3,11 @@
 ################################################################################################################
 
 
+variable "location" {
+  type        = string
+  description = "Azure region where the resource should be deployed."
+}
+
 variable "name" {
   type        = string
   description = "The name of the dns resolver."
@@ -101,12 +106,6 @@ For each endpoint, the "subnet_name" is required, it points to a subnet in the v
 DESCRIPTION
 }
 
-
-variable "location" {
-  type        = string
-  default     = null
-  description = "Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location."
-}
 
 variable "lock" {
   type = object({

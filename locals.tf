@@ -22,7 +22,7 @@ locals {
       }
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
-  
+
   forwarding_rules = flatten([
     for ruleset in local.forwarding_rulesets : [
       for rule_name, rule in ruleset.ruleset.rules : {
@@ -46,6 +46,4 @@ locals {
       }
     ]
   ])
-  
-
 }
