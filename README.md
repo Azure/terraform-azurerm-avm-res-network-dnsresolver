@@ -1,16 +1,7 @@
 <!-- BEGIN_TF_DOCS -->
 # terraform-azurerm-avm-template
 
-This is a template repo for Terraform Azure Verified Modules.
-
-Things to do:
-
-1. Set up a GitHub repo environment called `test`.
-1. Configure environment protection rule to ensure that approval is required before deploying to this environment.
-1. Create a user-assigned managed identity in your test subscription.
-1. Create a role assignment for the managed identity on your test subscription, use the minimum required role.
-1. Configure federated identity credentials on the user assigned managed identity. Use the GitHub environment.
-1. Search and update TODOs within the code and remove the TODO comments once complete.
+AVM Module for deploying a private DNS resolver.
 
 > [!IMPORTANT]
 > As the overall AVM framework is not GA (generally available) yet - the CI framework and test automation is not fully functional and implemented across all supported languages yet - breaking changes are expected, and additional customer feedback is yet to be gathered and incorporated. Hence, modules **MUST NOT** be published at version `1.0.0` or higher at this time.
@@ -24,9 +15,9 @@ Things to do:
 
 The following requirements are needed by this module:
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.3.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0)
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
 
 - <a name="requirement_random"></a> [random](#requirement\_random) (>= 3.5.0)
 
@@ -34,7 +25,7 @@ The following requirements are needed by this module:
 
 The following providers are used by this module:
 
-- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0)
+- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0, < 4.0)
 
 - <a name="provider_random"></a> [random](#provider\_random) (>= 3.5.0)
 
@@ -42,6 +33,7 @@ The following providers are used by this module:
 
 The following resources are used by this module:
 
+- [azurerm_management_lock.rulesets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
 - [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
 - [azurerm_private_dns_resolver.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver) (resource)
 - [azurerm_private_dns_resolver_dns_forwarding_ruleset.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_dns_forwarding_ruleset) (resource)
@@ -51,14 +43,20 @@ The following resources are used by this module:
 - [azurerm_private_dns_resolver_virtual_network_link.additional](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_virtual_network_link) (resource)
 - [azurerm_private_dns_resolver_virtual_network_link.deafult](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_virtual_network_link) (resource)
 - [azurerm_resource_group_template_deployment.telemetry](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group_template_deployment) (resource)
-- [azurerm_role_assignment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azurerm_role_assignment.dnsresolver](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azurerm_role_assignment.rulesets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
 - [random_id.telem](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) (resource)
-- [azurerm_resource_group.parent](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) (data source)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
 
 The following input variables are required:
+
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: Azure region where the resource should be deployed.
+
+Type: `string`
 
 ### <a name="input_name"></a> [name](#input\_name)
 
@@ -81,23 +79,6 @@ Type: `string`
 ## Optional Inputs
 
 The following input variables are optional (have default values):
-
-### <a name="input_customer_managed_key"></a> [customer\_managed\_key](#input\_customer\_managed\_key)
-
-Description: Customer managed keys that should be associated with the resource.
-
-Type:
-
-```hcl
-object({
-    key_vault_resource_id              = optional(string)
-    key_name                           = optional(string)
-    key_version                        = optional(string, null)
-    user_assigned_identity_resource_id = optional(string, null)
-  })
-```
-
-Default: `{}`
 
 ### <a name="input_diagnostic_settings"></a> [diagnostic\_settings](#input\_diagnostic\_settings)
 
@@ -145,7 +126,9 @@ Default: `true`
 
 ### <a name="input_inbound_endpoints"></a> [inbound\_endpoints](#input\_inbound\_endpoints)
 
-Description: A map of inbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description: A map of inbound endpoints to create on this resource.   
+Multiple endpoints can be created by providing multiple entries in the map.  
+For each endpoint, the "subnet\_name" is required, it points to a subnet in the virtual network provided in the "virtual\_network\_resource\_id" variable.
 
 Type:
 
@@ -157,14 +140,6 @@ map(object({
 ```
 
 Default: `{}`
-
-### <a name="input_location"></a> [location](#input\_location)
-
-Description: Azure region where the resource should be deployed.  If null, the location will be inferred from the resource group location.
-
-Type: `string`
-
-Default: `null`
 
 ### <a name="input_lock"></a> [lock](#input\_lock)
 
@@ -181,34 +156,18 @@ object({
 
 Default: `{}`
 
-### <a name="input_managed_identities"></a> [managed\_identities](#input\_managed\_identities)
-
-Description: Managed identities to be created for the resource.
-
-Type:
-
-```hcl
-object({
-    system_assigned            = optional(bool, false)
-    user_assigned_resource_ids = optional(set(string), [])
-  })
-```
-
-Default: `{}`
-
 ### <a name="input_outbound_endpoints"></a> [outbound\_endpoints](#input\_outbound\_endpoints)
 
-Description: A map of outbound endpoints to create on this resource. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-- `name` - The name for the endpoint
-- `subnet_name` - The subnet name from the virtual network provided
-- `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-  - `name` - The name of the forwarding ruleset
-  - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
-    - `name` - The name of the forwarding rule
-    - `domain_name` - The domain name to forward
-    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
-    - `destination_ip_addresses - a map of string, the key is the IP address and the value is the port
-`
+Description: A map of outbound endpoints to create on this resource.
+- name - (Optional) The name for the endpoint
+- subnet\_name - (Required) The subnet name from the virtual network provided.
+- forwarding\_ruleset - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
+  - name - (Optional) The name of the forwarding ruleset
+  - rules - (Optional) A map of forwarding rules to create on the forwarding ruleset.
+    - name - (Optional) The name of the forwarding rule
+    - domain\_name - (Required) The domain name to forward
+    - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - destination\_ip\_addresses - (Required) a map of string, the key is the IP address and the value is the port
 
 Type:
 
@@ -230,49 +189,7 @@ map(object({
   }))
 ```
 
-Default:
-
-```json
-{
-  "outbound1": {
-    "forwarding_ruleset": {
-      "ruleset1": {
-        "additional_virtual_network_links": [
-          "vnet1",
-          "vnet2"
-        ],
-        "link_with_outboutnd_endpoint_virtual_network": true,
-        "name": "ruleset1",
-        "rules": {
-          "rule1": {
-            "destination_ip_addresses": {
-              "10.1.1.1": "53",
-              "10.1.1.2": "53"
-            },
-            "domain_name": "example.com.",
-            "name": "rule1",
-            "state": "Enabled"
-          },
-          "rule2": {
-            "destination_ip_addresses": {
-              "10.2.2.2": "53"
-            },
-            "domain_name": "example2.com.",
-            "name": "rule2",
-            "state": "Enabled"
-          }
-        }
-      }
-    },
-    "name": "outbound1",
-    "subnet_name": "sub1"
-  },
-  "outbound2": {
-    "name": "outbound2",
-    "subnet_name": "sub2"
-  }
-}
-```
+Default: `{}`
 
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 

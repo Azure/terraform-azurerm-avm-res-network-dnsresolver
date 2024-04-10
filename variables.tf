@@ -1,8 +1,3 @@
-################################################################################################################
-####################################### Required Inputs ########################################################
-################################################################################################################
-
-
 variable "location" {
   type        = string
   description = "Azure region where the resource should be deployed."
@@ -28,15 +23,6 @@ variable "virtual_network_resource_id" {
   type        = string
   description = "The ID of the virtual network to deploy the private DNS resolver in."
 }
-
-
-################################################################################################################
-####################################### Optional Inputs ########################################################
-################################################################################################################
-
-# required AVM interfaces
-# remove only if not supported by the resource
-# tflint-ignore: terraform_unused_declarations
 
 variable "diagnostic_settings" {
   type = map(object({
@@ -106,7 +92,6 @@ For each endpoint, the "subnet_name" is required, it points to a subnet in the v
 DESCRIPTION
 }
 
-
 variable "lock" {
   type = object({
     name = optional(string, null)
@@ -121,7 +106,6 @@ variable "lock" {
     error_message = "The lock level must be one of: 'None', 'CanNotDelete', or 'ReadOnly'."
   }
 }
-
 
 variable "outbound_endpoints" {
   type = map(object({
@@ -139,7 +123,6 @@ variable "outbound_endpoints" {
       })))
     })))
   }))
-  nullable    = false
   default     = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
@@ -153,6 +136,7 @@ A map of outbound endpoints to create on this resource.
     - state - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
     - destination_ip_addresses - (Required) a map of string, the key is the IP address and the value is the port
 DESCRIPTION
+  nullable    = false
 }
 
 variable "role_assignments" {
@@ -186,6 +170,3 @@ variable "tags" {
   default     = {}
   description = "The map of tags to be applied to the resource"
 }
-
-
-
