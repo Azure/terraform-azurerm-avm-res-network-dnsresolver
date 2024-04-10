@@ -107,18 +107,6 @@ resource "azurerm_role_assignment" "dnsresolver" {
   skip_service_principal_aad_check       = each.value.skip_service_principal_aad_check
 }
 
-locals {
-  ruleset_role_assignments = [
-    for ruleset_index, ruleset in local.forwarding_rulesets : [
-      for role_assignment_key, role_assignment in var.role_assignments : {
-        ruleset_id          = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${ruleset.outbound_endpoint_name}-${ruleset.name}"].id
-        role_assignment     = role_assignment
-        role_assignment_key = role_assignment_key
-        composite_key       = "${ruleset_index}-${role_assignment_key}"
-      }
-    ]
-  ]
-}
 
 resource "azurerm_role_assignment" "rulesets" {
   for_each = {
