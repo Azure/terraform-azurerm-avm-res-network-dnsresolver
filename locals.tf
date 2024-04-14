@@ -23,7 +23,6 @@ locals {
       }
     ]
   ])
-
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
       for vnet_id in ruleset.additional_virtual_network_links_resource_ids : {
@@ -33,7 +32,6 @@ locals {
       }
     ]
   ])
-
   forwarding_rulesets = flatten([
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
@@ -45,7 +43,6 @@ locals {
       }
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
-
   ruleset_role_assignments = [
     for ruleset_index, ruleset in local.forwarding_rulesets : [
       for role_assignment_key, role_assignment in var.role_assignments : {
