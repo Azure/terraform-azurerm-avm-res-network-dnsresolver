@@ -2,14 +2,23 @@
 # Deafult locals
 
 locals {
-  location                           = var.location
-  resource_group_location            = var.location
+  # The location where the resources will be created
+  location = var.location
+  # The location of the resource group
+  resource_group_location = var.location
+  # The substring used to identify role definitions in Azure
   role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
 
-# Locals for outbound endpoints
+
+# The following locals create new lists from the outbound_endpoints variable
+# The outbound_endpoints variable is an object that represents each outbound endpoint to be created and attached to the private DNS resolver
+# as well as the forwarding rulesets, rules and virtual network links associated with each outbound endpoint
+# To be able to create the resources in the correct order, the locals are used to create lists of the forwarding rulesets, rules and virtual network links
 
 locals {
+  # Creating a list of forwarding rules for each forwarding ruleset.
+  # This list is itterated over in the azurerm_private_dns_resolver_forwarding_rule resource
   forwarding_rules = flatten([
     for ruleset in local.forwarding_rulesets : [
       for rule_name, rule in ruleset.ruleset.rules : {
@@ -23,6 +32,8 @@ locals {
       }
     ]
   ])
+  # Creating a list of virtual network links for each forwarding ruleset.
+  # This list is itterated over in the azurerm_private_dns_resolver_virtual_network_link.additional resource
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
       for vnet_id in ruleset.additional_virtual_network_links_resource_ids : {
@@ -32,6 +43,8 @@ locals {
       }
     ]
   ])
+  # Creating a list of forwarding rulesets for each outbound endpoint. skipping outbound endpoints without forwarding rulesets
+  # This list is itterated over in the azurerm_private_dns_resolver_dns_forwarding_ruleset resource
   forwarding_rulesets = flatten([
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
@@ -43,6 +56,8 @@ locals {
       }
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
+  # Creating a list of role assignments for each forwarding ruleset.
+  # This list is itterated over in the azurerm_role_assignment.rulesets resource
   ruleset_role_assignments = [
     for ruleset_index, ruleset in local.forwarding_rulesets : [
       for role_assignment_key, role_assignment in var.role_assignments : {

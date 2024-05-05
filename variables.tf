@@ -69,6 +69,9 @@ variable "lock" {
   }
 }
 
+# The outbound_endpoints variable is an object that allows creating outbound endpoints and related resources such as forwarding rulesets, rules and virtual network links
+# This is done in a hierarchial manner to best describe the relationship between the resources
+# The provider objects are broken down into lists in the locals.tf file to allow creation of the resources
 variable "outbound_endpoints" {
   type = map(object({
     name        = optional(string)
