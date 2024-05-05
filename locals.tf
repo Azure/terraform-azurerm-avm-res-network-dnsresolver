@@ -17,19 +17,6 @@ locals {
 # To be able to create the resources in the correct order, the locals are used to create lists of the forwarding rulesets, rules and virtual network links
 
 locals {
-  # Creating a list of forwarding rulesets for each outbound endpoint. skipping outbound endpoints without forwarding rulesets
-  # This list is itterated over in the azurerm_private_dns_resolver_dns_forwarding_ruleset resource
-  forwarding_rulesets = flatten([
-    for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
-      for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
-        outbound_endpoint_name                        = ob_ep_key
-        name                                          = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
-        link_with_outbound_endpoint_virtual_network   = ruleset.link_with_outbound_endpoint_virtual_network
-        additional_virtual_network_links_resource_ids = ruleset.additional_virtual_network_links_resource_ids
-        ruleset                                       = ruleset
-      }
-    ] if outbound_endpoint.forwarding_ruleset != null
-  ])
   # Creating a list of forwarding rules for each forwarding ruleset.
   # This list is itterated over in the azurerm_private_dns_resolver_forwarding_rule resource
   forwarding_rules = flatten([
@@ -55,6 +42,19 @@ locals {
         vnet_id                = vnet_id
       }
     ]
+  ])
+  # Creating a list of forwarding rulesets for each outbound endpoint. skipping outbound endpoints without forwarding rulesets
+  # This list is itterated over in the azurerm_private_dns_resolver_dns_forwarding_ruleset resource
+  forwarding_rulesets = flatten([
+    for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
+      for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
+        outbound_endpoint_name                        = ob_ep_key
+        name                                          = ruleset.name == null ? "ruleset-${ob_ep_key}-${ruleset_key}" : ruleset.name
+        link_with_outbound_endpoint_virtual_network   = ruleset.link_with_outbound_endpoint_virtual_network
+        additional_virtual_network_links_resource_ids = ruleset.additional_virtual_network_links_resource_ids
+        ruleset                                       = ruleset
+      }
+    ] if outbound_endpoint.forwarding_ruleset != null
   ])
   # Creating a list of role assignments for each forwarding ruleset.
   # This list is itterated over in the azurerm_role_assignment.rulesets resource
