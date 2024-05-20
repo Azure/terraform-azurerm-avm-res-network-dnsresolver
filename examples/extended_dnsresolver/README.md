@@ -4,6 +4,8 @@
 This deploys the module in its simplest form.
 
 ```hcl
+# This exmaple deploys a private DNS resolver with an inbound endpoint, two outbound endpoints, forwarding rulesets and rules.
+
 terraform {
   required_version = ">= 1.5.0"
   required_providers {
@@ -16,8 +18,11 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
-
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
 
 resource "azurerm_resource_group" "name" {
@@ -66,7 +71,8 @@ resource "azurerm_subnet" "out2" {
 }
 
 module "private_resolver" {
-  source                      = "../../"
+  source = "../../" # Replace source with the following line
+  #source  = "Azure/avm-res-network-dnsresolver/azurerm"
   resource_group_name         = azurerm_resource_group.name.name
   name                        = "resolver"
   virtual_network_resource_id = azurerm_virtual_network.name.id

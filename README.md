@@ -111,8 +111,10 @@ Type:
 
 ```hcl
 map(object({
-    name        = optional(string)
-    subnet_name = string
+    name                         = optional(string)
+    subnet_name                  = string
+    private_ip_allocation_method = optional(string, "Dynamic")
+    private_ip_address           = optional(string, null)
   }))
 ```
 

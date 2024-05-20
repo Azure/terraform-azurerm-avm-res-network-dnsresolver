@@ -16,7 +16,9 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
   tags                    = var.tags
 
   ip_configurations {
-    subnet_id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
+    subnet_id                    = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
+    private_ip_address           = each.value.private_ip_address
+    private_ip_allocation_method = each.value.private_ip_allocation_method
   }
 }
 
