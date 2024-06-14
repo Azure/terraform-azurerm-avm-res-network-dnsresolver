@@ -4,8 +4,6 @@
 locals {
   # The location where the resources will be created
   location = var.location
-  # The location of the resource group
-  resource_group_location = var.location
   # The substring used to identify role definitions in Azure
   role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
