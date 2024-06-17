@@ -49,6 +49,8 @@ resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${each.value.outbound_endpoint_name}-${each.value.ruleset_name}"].id
   domain_name               = each.value.domain_name
   name                      = each.value.rule_name
+  enabled                   = each.value.enabled
+  metadata                  = each.value.metadata
 
   dynamic "target_dns_servers" {
     for_each = each.value.destination_ip_addresses
@@ -68,14 +70,13 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "deafult" {
 }
 
 resource "azurerm_private_dns_resolver_virtual_network_link" "additional" {
-  for_each = tomap({ for link in local.forwarding_rules_vnet_links : "${link.outbound_endpoint_name}-${link.ruleset_name}-${substr(md5(link.vnet_id), 0, 6)}" => link })
+  for_each = tomap({ for link in local.forwarding_rules_vnet_links : "${link.outbound_endpoint_name}-${link.ruleset_name}-${link.vnet_key}" => link })
 
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this["${each.value.outbound_endpoint_name}-${each.value.ruleset_name}"].id
   name                      = "additional-${each.value.outbound_endpoint_name}-${each.value.ruleset_name}-${substr(md5(each.value.vnet_id), 0, 6)}"
   virtual_network_id        = each.value.vnet_id
+  metadata                  = each.value.metadata
 }
-
-
 
 # required AVM resources interfaces
 resource "azurerm_management_lock" "this" {

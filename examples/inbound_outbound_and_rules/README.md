@@ -1,7 +1,7 @@
 <!-- BEGIN_TF_DOCS -->
-# Default example
+# Inbound, Outbound, and Rules
 
-This deploys the module in its simplest form.
+This example shows how to create an inbound endpoint, an outbound endpoint, a ruleset, and rules.
 
 ```hcl
 # This exmaple deploys a private DNS resolver with an inbound endpoint, two outbound endpoints, forwarding rulesets and rules.
@@ -27,7 +27,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
-  name     = "rg-test-resolver-extended"
+  name     = "rg-test-resolver-outbound-rules"
 }
 
 resource "azurerm_virtual_network" "name" {
