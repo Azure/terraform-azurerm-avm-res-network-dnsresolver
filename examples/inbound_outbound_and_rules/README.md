@@ -27,7 +27,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
-  name     = "rg-test-resolver-extended"
+  name     = "rg-test-resolver-outbound-rules"
 }
 
 resource "azurerm_virtual_network" "name" {

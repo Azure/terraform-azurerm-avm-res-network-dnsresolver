@@ -31,7 +31,7 @@ locals {
 
 resource "azurerm_resource_group" "rg" {
   location = local.location
-  name     = "rg-test-resolver-extended"
+  name     = "rg-test-resolver-vnet-links"
 }
 
 resource "azurerm_virtual_network" "vnet1" {
