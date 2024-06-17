@@ -1,3 +1,3 @@
-# Default example
+# Inbound, Outbound, and Rules
 
-This deploys the module in its simplest form.
+This example shows how to create an inbound endpoint, an outbound endpoint, a ruleset, and rules.
