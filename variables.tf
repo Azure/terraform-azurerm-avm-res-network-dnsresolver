@@ -80,14 +80,19 @@ variable "outbound_endpoints" {
     name        = optional(string)
     subnet_name = string
     forwarding_ruleset = optional(map(object({
-      name                                          = optional(string)
-      link_with_outbound_endpoint_virtual_network   = optional(bool, true)
-      additional_virtual_network_links_resource_ids = optional(set(string), [])
+      name                                                = optional(string)
+      link_with_outbound_endpoint_virtual_network         = optional(bool, true)
+      metadata_for_outbound_endpoint_virtual_network_link = optional(map(string), null)
+      additional_virtual_network_links = optional(map(object({
+        vnet_id  = string
+        metadata = optional(map(string), null)
+      })), {})
       rules = optional(map(object({
         name                     = optional(string)
         domain_name              = string
-        state                    = optional(string, "Enabled")
         destination_ip_addresses = map(string)
+        enabled                  = optional(bool, true)
+        metadata                 = optional(map(string), null)
       })))
     })))
   }))
@@ -95,13 +100,19 @@ variable "outbound_endpoints" {
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
 - `name` - (Optional) The name for the endpoint 
+- `link_with_outbound_endpoint_virtual_network` - (Optional) Whether to link the outbound endpoint with the virtual network. Defaults to true.
+- `metadata_for_outbound_endpoint_virtual_network_link` - (Optional) A map of metadata to associate with the virtual network link.
+- `additional_virtual_network_links` - (Optional) A map of additional virtual network links to create.
+  - `vnet_id` - (Required) The ID of the virtual network to link to.
+  - `metadata` - (Optional) A map of metadata to associate with the virtual network link.
 - `subnet_name` - (Required) The subnet name from the virtual network provided. 
 - `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
   - `name` - (Optional) The name of the forwarding ruleset
   - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset.
     - `name` - (Optional) The name of the forwarding rule
     - `domain_name` - (Required) The domain name to forward
-    - `state` - (Optional) The state of the forwarding rule. Possible values are `Enabled` and `Disabled`. Defaults to `Enabled`.
+    - `enabled` - (Optional) Whether the forwarding rule is enabled. Defaults to true.
+    - `metadata` - (Optional) A map of metadata to associate with the forwarding rule
     - `destination_ip_addresses` - (Required) a map of string, the key is the IP address and the value is the port
 DESCRIPTION
   nullable    = false
