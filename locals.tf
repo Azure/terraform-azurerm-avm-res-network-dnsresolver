@@ -35,11 +35,12 @@ locals {
   # This list is itterated over in the azurerm_private_dns_resolver_virtual_network_link.additional resource
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
-      for vnet in ruleset.additional_virtual_network_links : {
+      for key,vnet in ruleset.additional_virtual_network_links : {
         outbound_endpoint_name = ruleset.outbound_endpoint_name
         ruleset_name           = ruleset.name
         vnet_id                = vnet.vnet_id
         metadata               = vnet.metadata
+        vnet_key               = key
       }
     ]
   ])
