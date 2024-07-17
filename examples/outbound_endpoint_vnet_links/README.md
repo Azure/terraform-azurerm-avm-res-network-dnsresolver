@@ -31,7 +31,7 @@ locals {
 
 resource "azurerm_resource_group" "rg" {
   location = local.location
-  name     = "rg-test-resolver-vnet-links"
+  name     = "rg-resolver-vnet-links"
 }
 
 resource "azurerm_virtual_network" "vnet1" {
@@ -149,12 +149,6 @@ The following requirements are needed by this module:
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
-
-## Providers
-
-The following providers are used by this module:
-
-- <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) (>= 3.71.0, < 4.0)
 
 ## Resources
 
