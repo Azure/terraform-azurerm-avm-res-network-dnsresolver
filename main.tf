@@ -54,6 +54,7 @@ resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
 
   dynamic "target_dns_servers" {
     for_each = each.value.destination_ip_addresses
+
     content {
       ip_address = target_dns_servers.key
       port       = target_dns_servers.value
