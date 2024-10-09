@@ -62,11 +62,11 @@ resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
   }
 }
 
-resource "azurerm_private_dns_resolver_virtual_network_link" "deafult" {
+resource "azurerm_private_dns_resolver_virtual_network_link" "default" {
   for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset if ruleset.link_with_outbound_endpoint_virtual_network == true })
 
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this[each.key].id
-  name                      = "deafult-${each.value.name}"
+  name                      = "default-${each.value.name}"
   virtual_network_id        = var.virtual_network_resource_id
 }
 
