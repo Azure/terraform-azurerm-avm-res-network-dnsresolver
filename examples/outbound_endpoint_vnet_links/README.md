@@ -130,22 +130,18 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
-
 - <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 5.0)
-
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (3.71.0)
 
 ## Resources
 
 The following resources are used by this module:
 
-- [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/resource_group) (resource)
-- [azurerm_subnet.name](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
-- [azurerm_subnet.out](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
-- [azurerm_subnet.out2](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
-- [azurerm_virtual_network.vnet1](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/virtual_network) (resource)
-- [azurerm_virtual_network.vnet2](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/virtual_network) (resource)
+- [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
+- [azurerm_subnet.name](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
+- [azurerm_subnet.out](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
+- [azurerm_subnet.out2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
+- [azurerm_virtual_network.vnet1](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
+- [azurerm_virtual_network.vnet2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
