@@ -6,24 +6,6 @@ This example shows how to create an outbound endpoint with VNet links.
 ```hcl
 # This exmaple deploys a private DNS resolver with an inbound endpoint, two outbound endpoints, forwarding rulesets and rules, and aditional vnet links.
 
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    # TODO: Ensure all required providers are listed here.
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.71.0, < 4.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
-}
 
 locals {
   location = "northeurope"
@@ -148,18 +130,22 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
+- <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
+
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 5.0)
+
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (3.71.0)
 
 ## Resources
 
 The following resources are used by this module:
 
-- [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
-- [azurerm_subnet.name](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_subnet.out](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_subnet.out2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_virtual_network.vnet1](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
-- [azurerm_virtual_network.vnet2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
+- [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/resource_group) (resource)
+- [azurerm_subnet.name](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
+- [azurerm_subnet.out](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
+- [azurerm_subnet.out2](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/subnet) (resource)
+- [azurerm_virtual_network.vnet1](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/virtual_network) (resource)
+- [azurerm_virtual_network.vnet2](https://registry.terraform.io/providers/hashicorp/azurerm/3.71.0/docs/resources/virtual_network) (resource)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs

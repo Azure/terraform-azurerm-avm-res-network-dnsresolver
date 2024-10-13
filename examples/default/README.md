@@ -7,25 +7,6 @@ This deploys the module in its simplest form. It will create a single inbound en
 
 # This example deploys the private DNS resolver into a subnet with a single inbound endpoint
 
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    # TODO: Ensure all required providers are listed here.
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.71.0, < 4.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
-}
-
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
   name     = "rg-test-resolver-simple"
@@ -72,7 +53,7 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 5.0)
 
 ## Resources
 
