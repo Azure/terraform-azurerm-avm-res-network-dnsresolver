@@ -6,25 +6,6 @@ This example shows how to create an inbound endpoint, an outbound endpoint, a ru
 ```hcl
 # This exmaple deploys a private DNS resolver with an inbound endpoint, two outbound endpoints, forwarding rulesets and rules.
 
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    # TODO: Ensure all required providers are listed here.
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = ">= 3.71.0, < 4.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {
-    resource_group {
-      prevent_deletion_if_contains_resources = false
-    }
-  }
-}
-
 resource "azurerm_resource_group" "name" {
   location = "northeurope"
   name     = "rg-test-resolver-outbound-rules"
@@ -129,7 +110,7 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.5.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 4.0)
+- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (>= 3.71.0, < 5.0)
 
 ## Resources
 
