@@ -224,13 +224,25 @@ Default: `null`
 
 The following outputs are exported:
 
+### <a name="output_forwarding_rulesets"></a> [forwarding\_rulesets](#output\_forwarding\_rulesets)
+
+Description: The forwarding rulesets of the DNS resolver.
+
 ### <a name="output_inbound_endpoint_ips"></a> [inbound\_endpoint\_ips](#output\_inbound\_endpoint\_ips)
 
 Description: The IP addresses of the inbound endpoints.
 
+### <a name="output_inbound_endpoints"></a> [inbound\_endpoints](#output\_inbound\_endpoints)
+
+Description: The inbound endpoints of the DNS resolver.
+
 ### <a name="output_name"></a> [name](#output\_name)
 
 Description: The name of the DNS resolver.
+
+### <a name="output_outbound_endpoints"></a> [outbound\_endpoints](#output\_outbound\_endpoints)
+
+Description: The outbound endpoints of the DNS resolver.
 
 ### <a name="output_resource"></a> [resource](#output\_resource)
 
