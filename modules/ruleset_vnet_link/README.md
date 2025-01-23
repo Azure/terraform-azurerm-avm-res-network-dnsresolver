@@ -56,7 +56,12 @@ No optional inputs.
 
 ## Outputs
 
-No outputs.
+The following outputs are exported:
+
+### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
+
+Description: Usage: To get the id of the link, use the same keys you used in the `virtual_networks` map.  
+module.<module\_name>.resource\_id["<vnet\_key>"]
 
 ## Modules
 
