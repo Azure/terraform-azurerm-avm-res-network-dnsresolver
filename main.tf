@@ -32,6 +32,12 @@ resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
   tags                    = var.tags
 }
 
+# the "terraform_data" resource is used to trigger replacement of the forwarding rulesets when the outbound endpoint is recreated"
+resource "terraform_data" "outbound" {
+  for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset })
+  input    = azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id
+}
+
 
 resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
   for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset })
@@ -41,6 +47,10 @@ resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
   private_dns_resolver_outbound_endpoint_ids = [azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id]
   resource_group_name                        = var.resource_group_name
   tags                                       = var.tags
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.outbound[each.key]]
+  }
 }
 
 resource "azurerm_private_dns_resolver_forwarding_rule" "this" {
