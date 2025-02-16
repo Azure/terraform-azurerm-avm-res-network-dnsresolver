@@ -8,7 +8,7 @@ resource "azurerm_private_dns_resolver" "this" {
 }
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
-  for_each = { for key, value in var.inbound_endpoints : value.name => value }
+  for_each = var.inbound_endpoints
 
   location                = local.location
   name                    = coalesce(each.value.name, "in-${each.key}-dnsResolver-inbound")
@@ -23,7 +23,7 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
 }
 
 resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
-  for_each = { for key, value in var.outbound_endpoints : value.name => value }
+  for_each = var.outbound_endpoints
 
   location                = local.location
   name                    = coalesce(each.value.name, "out-${each.key}-dnsResolver-outbound")
