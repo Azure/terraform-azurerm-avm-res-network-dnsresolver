@@ -84,6 +84,7 @@ variable "outbound_endpoints" {
       link_with_outbound_endpoint_virtual_network         = optional(bool, true)
       metadata_for_outbound_endpoint_virtual_network_link = optional(map(string), null)
       additional_virtual_network_links = optional(map(object({
+        name     = optional(string)
         vnet_id  = string
         metadata = optional(map(string), null)
       })), {})

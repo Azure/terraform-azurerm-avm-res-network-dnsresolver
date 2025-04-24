@@ -40,6 +40,7 @@ locals {
         ruleset_name           = ruleset.name
         vnet_id                = vnet.vnet_id
         metadata               = vnet.metadata
+        name                   = vnet.name
         vnet_key               = key
       }
     ]
