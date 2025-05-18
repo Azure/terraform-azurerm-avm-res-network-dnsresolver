@@ -59,11 +59,12 @@ resource "azurerm_virtual_network" "vnet2" {
 
 module "private_resolver" {
   source = "../../" # Replace source with the following line
+
+  location = local.location
+  name     = "resolver"
   #source  = "Azure/avm-res-network-dnsresolver/azurerm"
   resource_group_name         = azurerm_resource_group.rg.name
-  name                        = "resolver"
   virtual_network_resource_id = azurerm_virtual_network.vnet1.id
-  location                    = local.location
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
