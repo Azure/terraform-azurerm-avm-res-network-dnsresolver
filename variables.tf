@@ -51,6 +51,7 @@ A map of inbound endpoints to create on this resource.
 Multiple endpoints can be created by providing multiple entries in the map.
 For each endpoint, the `subnet_name` is required, it points to a subnet in the virtual network provided in the "virtual_network_resource_id" variable.
 DESCRIPTION
+  nullable    = false
 }
 
 variable "lock" {
