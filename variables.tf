@@ -44,12 +44,21 @@ variable "inbound_endpoints" {
     subnet_name                  = string
     private_ip_allocation_method = optional(string, "Dynamic")
     private_ip_address           = optional(string, null)
+    tags                         = optional(map(string), null)
+    merge_with_module_tags       = optional(bool, true)
   }))
   default     = {}
   description = <<DESCRIPTION
-A map of inbound endpoints to create on this resource. 
-Multiple endpoints can be created by providing multiple entries in the map.
-For each endpoint, the `subnet_name` is required, it points to a subnet in the virtual network provided in the "virtual_network_resource_id" variable.
+A map of inbound endpoints to create for this DNS resolver.
+
+- `name` - (Optional) The name of the inbound endpoint.
+- `subnet_name` - (Required) The name of the subnet within the virtual network specified by `virtual_network_resource_id` where the inbound endpoint will be deployed.
+- `private_ip_allocation_method` - (Optional) The allocation method for the private IP address. Possible values are `Dynamic` (default) or `Static`.
+- `private_ip_address` - (Optional) The static private IP address to assign if `private_ip_allocation_method` is set to `Static`.
+- `tags` - (Optional) A map of tags to assign to the inbound endpoint.
+- `merge_with_module_tags` - (Optional) Whether to merge the module tags with the inbound endpoint tags. Defaults to true.
+
+Multiple inbound endpoints can be created by providing multiple entries in the map.
 DESCRIPTION
   nullable    = false
 }
@@ -78,12 +87,16 @@ variable "lock" {
 # The provider objects are broken down into lists in the locals.tf file to allow creation of the resources
 variable "outbound_endpoints" {
   type = map(object({
-    name        = optional(string)
-    subnet_name = string
+    name                   = optional(string)
+    tags                   = optional(map(string), null)
+    merge_with_module_tags = optional(bool, true)
+    subnet_name            = string
     forwarding_ruleset = optional(map(object({
       name                                                = optional(string)
       link_with_outbound_endpoint_virtual_network         = optional(bool, true)
       metadata_for_outbound_endpoint_virtual_network_link = optional(map(string), null)
+      tags                                                = optional(map(string), null)
+      merge_with_module_tags                              = optional(bool, true)
       additional_virtual_network_links = optional(map(object({
         name     = optional(string)
         vnet_id  = string
@@ -101,21 +114,27 @@ variable "outbound_endpoints" {
   default     = {}
   description = <<DESCRIPTION
 A map of outbound endpoints to create on this resource.
-- `name` - (Optional) The name for the endpoint 
-- `link_with_outbound_endpoint_virtual_network` - (Optional) Whether to link the outbound endpoint with the virtual network. Defaults to true.
-- `metadata_for_outbound_endpoint_virtual_network_link` - (Optional) A map of metadata to associate with the virtual network link.
-- `additional_virtual_network_links` - (Optional) A map of additional virtual network links to create.
-  - `vnet_id` - (Required) The ID of the virtual network to link to.
-  - `metadata` - (Optional) A map of metadata to associate with the virtual network link.
-- `subnet_name` - (Required) The subnet name from the virtual network provided. 
+
+- `name` - (Optional) The name for the endpoint.
+- `tags` - (Optional) A map of tags to assign to the outbound endpoint.
+- `merge_with_module_tags` - (Optional) Whether to merge the module tags with the outbound endpoint tags. Defaults to true.
+- `subnet_name` - (Required) The subnet name from the virtual network provided.
 - `forwarding_ruleset` - (Optional) A map of forwarding rulesets to create on the outbound endpoint.
-  - `name` - (Optional) The name of the forwarding ruleset
+  - `name` - (Optional) The name of the forwarding ruleset.
+  - `link_with_outbound_endpoint_virtual_network` - (Optional) Whether to link the outbound endpoint with the hosting virtual network. Defaults to true.
+  - `metadata_for_outbound_endpoint_virtual_network_link` - (Optional) A map of metadata to associate with the virtual network link.
+  - `tags` - (Optional) A map of tags to assign to the forwarding ruleset.
+  - `merge_with_module_tags` - (Optional) Whether to merge the module tags with the forwarding ruleset tags. Defaults to true.
+  - `additional_virtual_network_links` - (Optional) A map of additional virtual network links to create.
+    - `name` - (Optional) The name of the additional virtual network link.
+    - `vnet_id` - (Required) The ID of the virtual network to link to.
+    - `metadata` - (Optional) A map of metadata to associate with the virtual network link.
   - `rules` - (Optional) A map of forwarding rules to create on the forwarding ruleset.
-    - `name` - (Optional) The name of the forwarding rule
-    - `domain_name` - (Required) The domain name to forward
+    - `name` - (Optional) The name of the forwarding rule.
+    - `domain_name` - (Required) The domain name to forward.
+    - `destination_ip_addresses` - (Required) A map of string, the key is the IP address and the value is the port.
     - `enabled` - (Optional) Whether the forwarding rule is enabled. Defaults to true.
-    - `metadata` - (Optional) A map of metadata to associate with the forwarding rule
-    - `destination_ip_addresses` - (Required) a map of string, the key is the IP address and the value is the port
+    - `metadata` - (Optional) A map of metadata to associate with the forwarding rule.
 DESCRIPTION
   nullable    = false
 }
