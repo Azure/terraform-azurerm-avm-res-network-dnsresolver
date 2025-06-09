@@ -75,16 +75,27 @@ module "private_resolver" {
     "inbound1" = {
       name        = "inbound1"
       subnet_name = azurerm_subnet.name.name
+      tags = {
+        "source" = "onprem"
+      }
 
     }
   }
   outbound_endpoints = {
     "outbound1" = {
-      name        = "outbound1"
-      subnet_name = azurerm_subnet.out.name
+      name = "outbound1"
+      tags = {
+        "destination" = "onprem"
+      }
+      merge_with_module_tags = false
+      subnet_name            = azurerm_subnet.out.name
       forwarding_ruleset = {
         "ruleset1" = {
           name = "ruleset1"
+          tags = {
+            "rules" = "internet"
+          }
+          merge_with_module_tags = true
           additional_virtual_network_links = {
             "vnet2" = {
               vnet_id = azurerm_virtual_network.vnet2.id
@@ -120,6 +131,9 @@ module "private_resolver" {
       name        = "outbound2"
       subnet_name = azurerm_subnet.out2.name
     }
+  }
+  tags = {
+    "environment" = "test"
   }
 }
 ```

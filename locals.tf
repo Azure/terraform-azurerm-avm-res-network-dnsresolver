@@ -55,6 +55,8 @@ locals {
         link_with_outbound_endpoint_virtual_network    = ruleset.link_with_outbound_endpoint_virtual_network
         metadata_for_outbound_endpoint_virtual_network = ruleset.metadata_for_outbound_endpoint_virtual_network_link
         additional_virtual_network_links               = ruleset.additional_virtual_network_links
+        tags                                           = ruleset.tags
+        merge_with_module_tags                         = ruleset.merge_with_module_tags
         ruleset                                        = ruleset
       }
     ] if outbound_endpoint.forwarding_ruleset != null
