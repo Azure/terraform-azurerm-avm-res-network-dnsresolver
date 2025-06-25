@@ -7,7 +7,7 @@ locals {
 
 resource "azurerm_resource_group" "rg" {
   location = local.location
-  name     = "rg-resolver-vnet-links"
+  name     = "rg-resolver-ruleset-links"
 }
 
 resource "azurerm_virtual_network" "vnet1" {
@@ -50,13 +50,6 @@ resource "azurerm_subnet" "out2" {
   }
 }
 
-resource "azurerm_virtual_network" "vnet2" {
-  location            = local.location
-  name                = "vnet-test-resolver2"
-  resource_group_name = azurerm_resource_group.rg.name
-  address_space       = ["10.90.0.0/16"]
-}
-
 module "private_resolver" {
   source = "../../" # Replace source with the following line
 
@@ -71,24 +64,27 @@ module "private_resolver" {
       tags = {
         "source" = "onprem"
       }
-
+      merge_with_module_tags = false
     }
   }
   outbound_endpoints = {
     "outbound1" = {
-      name = "outbound1"
+      name        = "outbound1"
+      subnet_name = azurerm_subnet.out.name
       tags = {
         "destination" = "onprem"
       }
-      merge_with_module_tags = false
-      subnet_name            = azurerm_subnet.out.name
+      merge_with_module_tags = true
       forwarding_ruleset = {
         "ruleset1" = {
-          name = "ruleset1"
           tags = {
-            "rules" = "internet"
+            "environment" = "test"
           }
-          merge_with_module_tags = true
+          merge_with_module_tags = false
+          name                   = "ruleset1"
+          additional_outbound_endpoint_link = {
+            outbound_endpoint_key = "outbound2"
+          }
           additional_virtual_network_links = {
             "vnet2" = {
               vnet_id = azurerm_virtual_network.vnet2.id
@@ -125,7 +121,8 @@ module "private_resolver" {
       subnet_name = azurerm_subnet.out2.name
     }
   }
+  #source  = "Azure/avm-res-network-dnsresolver/azurerm"
   tags = {
-    "environment" = "test"
+    "created_by" = "terraform"
   }
 }

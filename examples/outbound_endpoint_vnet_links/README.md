@@ -17,10 +17,10 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_virtual_network" "vnet1" {
-  address_space       = ["10.0.0.0/16"]
   location            = local.location
   name                = "vnet-test-resolver"
   resource_group_name = azurerm_resource_group.rg.name
+  address_space       = ["10.0.0.0/16"]
 }
 
 resource "azurerm_subnet" "name" {
@@ -57,18 +57,17 @@ resource "azurerm_subnet" "out2" {
 }
 
 resource "azurerm_virtual_network" "vnet2" {
-  address_space       = ["10.90.0.0/16"]
   location            = local.location
   name                = "vnet-test-resolver2"
   resource_group_name = azurerm_resource_group.rg.name
+  address_space       = ["10.90.0.0/16"]
 }
 
 module "private_resolver" {
   source = "../../" # Replace source with the following line
 
-  location = local.location
-  name     = "resolver"
-  #source  = "Azure/avm-res-network-dnsresolver/azurerm"
+  location                    = local.location
+  name                        = "resolver"
   resource_group_name         = azurerm_resource_group.rg.name
   virtual_network_resource_id = azurerm_virtual_network.vnet1.id
   inbound_endpoints = {
