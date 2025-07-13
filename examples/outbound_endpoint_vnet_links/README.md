@@ -13,7 +13,7 @@ locals {
 
 resource "azurerm_resource_group" "rg" {
   location = local.location
-  name     = "rg-resolver-vnet-links"
+  name     = "rg-resolver-vnet-link"
 }
 
 resource "azurerm_virtual_network" "vnet1" {
