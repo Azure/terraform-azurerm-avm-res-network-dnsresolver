@@ -4,8 +4,7 @@
 This example shows how to create an outbound endpoint with VNet links.
 
 ```hcl
-# This exmaple deploys a private DNS resolver with an inbound endpoint, two outbound endpoints, forwarding rulesets and rules, and aditional vnet links.
-
+# This exmaple demonstrates how to link a forwarding ruleset to 2 outbound endpoints using the "additional_outbound_endpoint_link"
 
 locals {
   location = "northeurope"
@@ -86,20 +85,11 @@ module "private_resolver" {
           tags = {
             "environment" = "test"
           }
+          additional_outbound_endpoint_link = {
+            outbound_endpoint_key = "outbound2" # a key referencing another outbound endpoint in this map
+          }
           merge_with_module_tags = false
           name                   = "ruleset1"
-          additional_outbound_endpoint_link = {
-            outbound_endpoint_key = "outbound2"
-          }
-          additional_virtual_network_links = {
-            "vnet2" = {
-              vnet_id = azurerm_virtual_network.vnet2.id
-              metadata = {
-                "type" = "spoke"
-                "env"  = "dev"
-              }
-            }
-          }
           rules = {
             "rule1" = {
               name        = "rule1"
@@ -127,7 +117,6 @@ module "private_resolver" {
       subnet_name = azurerm_subnet.out2.name
     }
   }
-  #source  = "Azure/avm-res-network-dnsresolver/azurerm"
   tags = {
     "created_by" = "terraform"
   }
