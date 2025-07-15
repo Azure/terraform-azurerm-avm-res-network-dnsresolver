@@ -38,7 +38,8 @@ resource "terraform_data" "outbound" {
   input    = azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id
 }
 
-
+# Creating a private DNS resolver DNS forwarding ruleset and forwarding rules for each outbound endpoint.
+# The ruleset is linked to the outbound endpoint it is created under, and can optionally link to an additional outbound endpoint provided in the "additional_outbound_endpoint_link" attribute.
 resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
   for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset })
 
