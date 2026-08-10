@@ -1,4 +1,3 @@
-
 resource "azurerm_private_dns_resolver" "this" {
   location            = local.location
   name                = var.name
@@ -35,7 +34,8 @@ resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
 # the "terraform_data" resource is used to trigger replacement of the forwarding rulesets when the outbound endpoint is recreated"
 resource "terraform_data" "outbound" {
   for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset })
-  input    = azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id
+
+  input = azurerm_private_dns_resolver_outbound_endpoint.this[each.value.outbound_endpoint_name].id
 }
 
 # Creating a private DNS resolver DNS forwarding ruleset and forwarding rules for each outbound endpoint.
@@ -121,7 +121,6 @@ resource "azurerm_role_assignment" "dnsresolver" {
   role_definition_name                   = strcontains(lower(each.value.role_definition_id_or_name), lower(local.role_definition_resource_substring)) ? null : each.value.role_definition_id_or_name
   skip_service_principal_aad_check       = each.value.skip_service_principal_aad_check
 }
-
 
 resource "azurerm_role_assignment" "rulesets" {
   for_each = {
