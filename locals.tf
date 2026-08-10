@@ -1,4 +1,3 @@
-
 # Deafult locals
 
 locals {
@@ -7,7 +6,6 @@ locals {
   # The substring used to identify role definitions in Azure
   role_definition_resource_substring = "/providers/Microsoft.Authorization/roleDefinitions"
 }
-
 
 # The following locals create new lists from the outbound_endpoints variable
 # The outbound_endpoints variable is an object that represents each outbound endpoint to be created and attached to the private DNS resolver
