@@ -20,10 +20,10 @@ resource "azurerm_virtual_network" "name" {
 }
 
 resource "azurerm_subnet" "name" {
-  address_prefixes     = ["10.0.0.0/24"]
   name                 = "subnet-test-resolver-inbound"
   resource_group_name  = azurerm_resource_group.name.name
   virtual_network_name = azurerm_virtual_network.name.name
+  address_prefixes     = ["10.0.0.0/24"]
 
   lifecycle {
     ignore_changes = [delegation]
@@ -31,10 +31,10 @@ resource "azurerm_subnet" "name" {
 }
 
 resource "azurerm_subnet" "out" {
-  address_prefixes     = ["10.0.1.0/24"]
   name                 = "subnet-test-resolver-outbound"
   resource_group_name  = azurerm_resource_group.name.name
   virtual_network_name = azurerm_virtual_network.name.name
+  address_prefixes     = ["10.0.1.0/24"]
 
   lifecycle {
     ignore_changes = [delegation]
@@ -42,10 +42,10 @@ resource "azurerm_subnet" "out" {
 }
 
 resource "azurerm_subnet" "out2" {
-  address_prefixes     = ["10.0.2.0/24"]
   name                 = "subnet-test-resolver-outbound2"
   resource_group_name  = azurerm_resource_group.name.name
   virtual_network_name = azurerm_virtual_network.name.name
+  address_prefixes     = ["10.0.2.0/24"]
 
   lifecycle {
     ignore_changes = [delegation]
