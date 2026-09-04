@@ -5,7 +5,6 @@
 This deploys the module in its simplest form. It will create a single inbound endpoint.
 
 ```hcl
-
 # This example deploys the private DNS resolver into a subnet with a single inbound endpoint
 
 resource "azurerm_resource_group" "name" {
@@ -21,10 +20,10 @@ resource "azurerm_virtual_network" "name" {
 }
 
 resource "azurerm_subnet" "name" {
-  address_prefixes     = ["10.0.0.0/24"]
   name                 = "subnet-test-resolver-inbound"
   resource_group_name  = azurerm_resource_group.name.name
   virtual_network_name = azurerm_virtual_network.name.name
+  address_prefixes     = ["10.0.0.0/24"]
 
   lifecycle {
     ignore_changes = [delegation]
