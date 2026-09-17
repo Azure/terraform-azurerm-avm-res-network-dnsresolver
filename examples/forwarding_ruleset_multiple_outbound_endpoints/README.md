@@ -63,6 +63,7 @@ module "private_resolver" {
   name                        = "resolver"
   resource_group_name         = azurerm_resource_group.rg.name
   virtual_network_resource_id = azurerm_virtual_network.vnet1.id
+  enable_telemetry            = false
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
