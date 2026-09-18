@@ -31,7 +31,7 @@ module "private_resolver" {
   #source  = "Azure/avm-res-network-dnsresolver/azurerm"
   resource_group_name         = azurerm_resource_group.name.name
   virtual_network_resource_id = azurerm_virtual_network.name.id
-  enable_telemetry            = false
+  enable_telemetry            = var.enable_telemetry
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
