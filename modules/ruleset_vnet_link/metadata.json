@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Azure/azure-verified-modules-tools/main/src/Avm.Authoring/Resources/Schemas/v1/avm-module-metadata.schema.json",
+  "moduleDisplayName": "Azure Private DNS Resolver Ruleset VNet Link Module",
+  "moduleDescription": "This is a module for linking existing vnets to an existing forwarding ruleset in an Azure Private DNS Resolver outbound endpoint.",
+  "canonicalType": "Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks",
+  "telemetryIdPrefix": "46d3xtrf.res.a19e5a1"
+}
