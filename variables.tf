@@ -26,6 +26,16 @@ variable "virtual_network_resource_id" {
 The ID of the virtual network to deploy the inbound and outbound endpoints into. The vnet should have appropriate subnets for the endpoints.
 For more information on how to configure subnets for inbound and outbounbd endpoints, see the modules readme.
 DESCRIPTION
+
+  validation {
+    # TFNFR38 (Severity-MUST): validate a resource ID with a LITERAL type through
+    # `provider::azapi::parse_resource_id`, never with a hand-rolled regex.
+    condition = (
+      can(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", var.virtual_network_resource_id)) &&
+      try(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", var.virtual_network_resource_id).resource_group_name, "") != ""
+    )
+    error_message = "`virtual_network_resource_id` must be a valid `Microsoft.Network/virtualNetworks` resource ID, for example `/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/virtualNetworks/vnet`."
+  }
 }
 
 variable "enable_telemetry" {
@@ -37,6 +47,42 @@ For more information see <https://aka.ms/avm/telemetryinfo>.
 If it is set to false, then no telemetry will be collected.
 DESCRIPTION
   nullable    = false
+}
+
+variable "ignore_body_changes" {
+  type = object({
+    network_dns_forwarding_rulesets                       = optional(list(string), [])
+    network_dns_forwarding_rulesets_forwarding_rules      = optional(list(string), [])
+    network_dns_forwarding_rulesets_virtual_network_links = optional(list(string), [])
+    network_dns_resolvers                                 = optional(list(string), [])
+    network_dns_resolvers_inbound_endpoints               = optional(list(string), [])
+    network_dns_resolvers_outbound_endpoints              = optional(list(string), [])
+  })
+  default     = {}
+  description = <<DESCRIPTION
+(Optional) Body property paths whose changes the `azapi` provider ignores after creation, letting an out-of-band controller own those properties without producing perpetual `terraform plan` drift.
+
+Paths are in dot notation relative to the request body, for example `["properties.dnsResolverOutboundEndpoints"]`.
+
+- `network_dns_forwarding_rulesets` - (Optional) Ignored body paths for the DNS forwarding rulesets. Default `[]`.
+- `network_dns_forwarding_rulesets_forwarding_rules` - (Optional) Ignored body paths for the forwarding rules. Default `[]`.
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) Ignored body paths for both the default and the additional virtual network links. Default `[]`.
+- `network_dns_resolvers` - (Optional) Ignored body paths for the DNS resolver. Default `[]`.
+- `network_dns_resolvers_inbound_endpoints` - (Optional) Ignored body paths for the inbound endpoints. Default `[]`.
+- `network_dns_resolvers_outbound_endpoints` - (Optional) Ignored body paths for the outbound endpoints. Default `[]`.
+
+While a path is ignored, configuration changes at that path are no longer sent to Azure. The value is write-only provider state, so a change only takes effect after an `apply`, and supplying a non-empty list requires Terraform 1.11 or later. Empty lists are collapsed to `null` before they reach the provider.
+DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition = alltrue(flatten([
+      for paths in values(var.ignore_body_changes) : [
+        for path in paths : length(trimspace(path)) > 0
+      ]
+    ]))
+    error_message = "Every `ignore_body_changes` entry must be a non-empty body path in dot notation, for example \"properties.dnsResolverOutboundEndpoints\"."
+  }
 }
 
 variable "inbound_endpoints" {
@@ -62,6 +108,22 @@ A map of inbound endpoints to create for this DNS resolver.
 Multiple inbound endpoints can be created by providing multiple entries in the map.
 DESCRIPTION
   nullable    = false
+
+  validation {
+    condition     = alltrue([for endpoint in var.inbound_endpoints : contains(["Dynamic", "Static"], endpoint.private_ip_allocation_method)])
+    error_message = "`inbound_endpoints[*].private_ip_allocation_method` must be either `Dynamic` or `Static`."
+  }
+  validation {
+    # Reproduces the check AzureRM performed in `expandIPConfigurationModel`
+    # (inbound_endpoint_resource.go L296-303), which failed at apply time. Failing at plan
+    # time is strictly better, and AzAPI would otherwise send the request straight to ARM.
+    condition     = alltrue([for endpoint in var.inbound_endpoints : !(endpoint.private_ip_allocation_method == "Dynamic" && endpoint.private_ip_address != null)])
+    error_message = "`inbound_endpoints[*].private_ip_address` must not be set when `private_ip_allocation_method` is `Dynamic`."
+  }
+  validation {
+    condition     = alltrue([for endpoint in var.inbound_endpoints : !(endpoint.private_ip_allocation_method == "Static" && endpoint.private_ip_address == null)])
+    error_message = "`inbound_endpoints[*].private_ip_address` is required when `private_ip_allocation_method` is `Static`."
+  }
 }
 
 variable "lock" {
@@ -145,6 +207,94 @@ A map of outbound endpoints to create for this DNS resolver.
 Multiple outbound endpoints can be created by providing multiple entries in the map.
 DESCRIPTION
   nullable    = false
+
+  validation {
+    # TFNFR38 (Severity-MUST): a LITERAL type through `parse_resource_id`, never a regex.
+    condition = alltrue(flatten([
+      for endpoint in var.outbound_endpoints : [
+        for ruleset in coalesce(endpoint.forwarding_ruleset, {}) : [
+          for link in ruleset.additional_virtual_network_links :
+          can(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", link.vnet_id)) &&
+          try(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", link.vnet_id).resource_group_name, "") != ""
+        ]
+      ]
+    ]))
+    error_message = "Every `outbound_endpoints[*].forwarding_ruleset[*].additional_virtual_network_links[*].vnet_id` must be a valid `Microsoft.Network/virtualNetworks` resource ID."
+  }
+  validation {
+    condition = alltrue(flatten([
+      for endpoint in var.outbound_endpoints : [
+        for ruleset in coalesce(endpoint.forwarding_ruleset, {}) : [
+          for rule in coalesce(ruleset.rules, {}) : [
+            for port in values(rule.destination_ip_addresses) : can(tonumber(port))
+          ]
+        ]
+      ]
+    ]))
+    error_message = "Every value in `outbound_endpoints[*].forwarding_ruleset[*].rules[*].destination_ip_addresses` must be a port number, for example `\"53\"`. The map key is the destination IP address and the value is the port."
+  }
+}
+
+variable "resource_types" {
+  type = object({
+    network_dns_forwarding_rulesets                       = optional(string, "Microsoft.Network/dnsForwardingRulesets@2025-05-01")
+    network_dns_forwarding_rulesets_forwarding_rules      = optional(string, "Microsoft.Network/dnsForwardingRulesets/forwardingRules@2025-05-01")
+    network_dns_forwarding_rulesets_virtual_network_links = optional(string, "Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01")
+    network_dns_resolvers                                 = optional(string, "Microsoft.Network/dnsResolvers@2025-05-01")
+    network_dns_resolvers_inbound_endpoints               = optional(string, "Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01")
+    network_dns_resolvers_outbound_endpoints              = optional(string, "Microsoft.Network/dnsResolvers/outboundEndpoints@2025-05-01")
+  })
+  default     = {}
+  description = <<DESCRIPTION
+(Optional) The Azure resource type and API version used for each resource created by this module. Each default is the latest GA API version for that type.
+
+- `network_dns_forwarding_rulesets` - (Optional) The type and API version of the DNS forwarding rulesets. Default `Microsoft.Network/dnsForwardingRulesets@2025-05-01`.
+- `network_dns_forwarding_rulesets_forwarding_rules` - (Optional) The type and API version of the forwarding rules. Default `Microsoft.Network/dnsForwardingRulesets/forwardingRules@2025-05-01`.
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) The type and API version of the virtual network links. Default `Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01`.
+- `network_dns_resolvers` - (Optional) The type and API version of the DNS resolver. Default `Microsoft.Network/dnsResolvers@2025-05-01`.
+- `network_dns_resolvers_inbound_endpoints` - (Optional) The type and API version of the inbound endpoints. Default `Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01`.
+- `network_dns_resolvers_outbound_endpoints` - (Optional) The type and API version of the outbound endpoints. Default `Microsoft.Network/dnsResolvers/outboundEndpoints@2025-05-01`.
+
+The lock and role assignment types are owned by the `Azure/avm-utl-interfaces/azure` module and are not configurable here.
+DESCRIPTION
+  nullable    = false
+
+  validation {
+    condition = alltrue([
+      for type in values(var.resource_types) : can(regex("^[^/@]+/[^@]+@[0-9]{4}-[0-9]{2}-[0-9]{2}(-preview)?$", type))
+    ])
+    error_message = "Every `resource_types` entry must be of the form `Namespace/type@yyyy-mm-dd`, for example `Microsoft.Network/dnsResolvers@2025-05-01`."
+  }
+}
+
+variable "retry" {
+  type = object({
+    error_message_regex = optional(list(string), [
+      "AnotherOperationInProgress",
+      "ReferencedResourceNotProvisioned",
+      "CannotDeleteResource",
+      "PrincipalNotFound",
+      "ScopeLocked",
+    ])
+    interval_seconds     = optional(number, null)
+    max_interval_seconds = optional(number, null)
+  })
+  default     = {}
+  description = <<DESCRIPTION
+(Optional) The retry configuration applied to every `azapi_resource` created by this module.
+
+- `error_message_regex` - (Optional) A list of regular expressions matched against the error message. The request is retried when any of them matches. The AzAPI provider requires this attribute, so it cannot be `null`; pass `[]` to disable retries.
+- `interval_seconds` - (Optional) The base number of seconds to wait between retries. Defaults to the AzAPI provider default (`10`).
+- `max_interval_seconds` - (Optional) The maximum number of seconds to wait between retries. Defaults to the AzAPI provider default (`180`).
+
+The default list covers the transient failures this module's resources actually hit:
+
+- `AnotherOperationInProgress` - a concurrent write against the same virtual network or subnet.
+- `ReferencedResourceNotProvisioned` - the subnet or virtual network is still provisioning.
+- `CannotDeleteResource` - on teardown, ARM still reports a nested resource (an inbound or outbound endpoint, or a forwarding rule) as present after its `DELETE` has already completed. Matches the default of the AVM AzAPI reference module `avm-res-network-privatednszone`.
+- `PrincipalNotFound` - the role assignment principal has not finished propagating through Entra ID. This replaces the `skip_service_principal_aad_check` argument, which has no ARM equivalent.
+- `ScopeLocked` - a management lock is still being removed from the scope.
+DESCRIPTION
 }
 
 variable "role_assignments" {
@@ -181,4 +331,26 @@ variable "tags" {
   type        = map(string)
   default     = null
   description = "(Optional) Tags of the resource."
+}
+
+variable "timeouts" {
+  type = object({
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
+  })
+  default     = {}
+  description = <<DESCRIPTION
+(Optional) Timeouts for the resource operations. Each value must be a string parsable as a Go duration, for example `"30s"`, `"5m"` or `"1h30m"`.
+
+Any attribute left unset falls back to the timeout default of the `azurerm` resource this module replaced. Every replaced resource -- the six `azurerm_private_dns_resolver*` resources plus `azurerm_management_lock` and `azurerm_role_assignment` -- shared the same defaults: create 30m, read 5m, update 30m, delete 30m. The fallbacks live in `local.timeouts` in `locals.tf`.
+
+Set the whole object to `null` to omit the `timeouts` block entirely and use the AzAPI provider defaults.
+
+- `create` - (Optional) Timeout for create operations.
+- `read` - (Optional) Timeout for read operations.
+- `update` - (Optional) Timeout for update operations.
+- `delete` - (Optional) Timeout for delete operations.
+DESCRIPTION
 }

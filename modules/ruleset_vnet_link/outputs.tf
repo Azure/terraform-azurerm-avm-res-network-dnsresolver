@@ -4,7 +4,7 @@ Usage: To get the id of the link, use the same keys you used in the `virtual_net
 module.<module_name>.resource_id["<vnet_key>"]
 DESCRIPTION
   value = {
-    for vnet_key, vnet_resource in azurerm_private_dns_resolver_virtual_network_link.this :
+    for vnet_key, vnet_resource in azapi_resource.this :
     vnet_key => vnet_resource.id
   }
 }
