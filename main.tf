@@ -55,6 +55,15 @@ resource "azapi_resource" "this" {
   }
 }
 
+data "azapi_resource_list" "inbound_endpoints" {
+  count = length(var.inbound_endpoints) > 0 ? 1 : 0
+
+  parent_id              = azapi_resource.this.id
+  type                   = var.resource_types.network_dns_resolvers_inbound_endpoints
+  response_export_values = ["value"]
+  retry                  = var.retry
+}
+
 resource "azapi_resource" "inbound_endpoint" {
   for_each = var.inbound_endpoints
 
@@ -69,9 +78,7 @@ resource "azapi_resource" "inbound_endpoint" {
           subnet = {
             id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
           }
-          # AzureRM omits `privateIpAddress` when empty (expandIPConfigurationModel L308);
-          # `ignore_null_property` reproduces that.
-          privateIpAddress          = each.value.private_ip_address
+          privateIpAddress          = local.inbound_endpoint_private_ip_addresses[each.key]
           privateIpAllocationMethod = each.value.private_ip_allocation_method
         }
       ]

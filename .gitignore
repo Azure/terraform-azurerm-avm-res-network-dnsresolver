@@ -6,6 +6,9 @@
 *.tfstate.*
 
 **/tests/*
+!tests/unit/
+tests/unit/*
+!tests/unit/*.tftest.hcl
 
 # Crash log files
 crash.log

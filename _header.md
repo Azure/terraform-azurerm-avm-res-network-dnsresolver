@@ -26,7 +26,12 @@ This module now creates every Azure resource with the [`azapi`](https://registry
 > [!IMPORTANT]
 > Run the upgrade plan **with refresh enabled** (the default). The state move records only the resource identity; the provider reads the rest of each resource body back from Azure during the refresh. Planning the upgrade with `-refresh=false` can produce spurious replacements.
 
-**Expected upgrade plan.** The upgrade is designed to produce no destroys and no replacements. An in-place update on the migrated resources is expected and harmless: it reconciles the API version recorded by the state move and populates the exported response values.
+**Expected upgrade plan.** The upgrade is designed to produce no unintended destroys or replacements. Review in-place updates before applying; they reconcile the API version recorded by the state move and populate exported response values.
+
+For an existing Dynamic inbound endpoint, the module lists inbound endpoints before its update
+and resends the assigned IP only when the endpoint name, subnet and allocation method match.
+New endpoints leave the IP unset so Azure can assign it. Explicit Static IP values take
+precedence. The deployment identity needs permission to list inbound endpoints on the resolver.
 
 **Breaking changes.**
 
