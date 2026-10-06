@@ -89,20 +89,11 @@ resource "azapi_resource" "inbound_endpoint" {
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_resolvers_inbound_endpoints) > 0 ? var.ignore_body_changes.network_dns_resolvers_inbound_endpoints : null
   ignore_null_property = true
   read_headers         = local.azapi_headers
-  # 🔴 NARROWER THAN AzureRM ON PURPOSE. `azurerm_private_dns_resolver_inbound_endpoint`
-  # marked the whole `ip_configurations` list ForceNew (L73). A whole-list ref cannot be used
-  # here: at adoption the `move_state` refresh sets `state.body` from the API response
-  # (`azapi_resource.go` L1281-1289), which carries the SERVER-ASSIGNED `privateIpAddress`
-  # while the config holds `null` for a `Dynamic` endpoint -- the lists would differ and the
-  # endpoint would be planned for REPLACE. The subnet is the only part of the IP configuration
-  # that is genuinely immutable, so that is what is watched.
+  # Watch the subnet rather than the whole list, which also contains the server-assigned IP.
   replace_triggers_refs = [
     "properties.ipConfigurations[0].subnet.id",
   ]
-  # NOT silenced with `lifecycle { ignore_changes = [response_export_values] }`: the
-  # `inbound_endpoint_ips` output reads `output.properties.ipConfigurations`, and ignoring the
-  # attribute would pin it to the `null` left by the state move forever. The cost is a single
-  # in-place update at adoption -- a change, never a destroy or a replace.
+  # Refresh these exports at adoption so downstream DNS consumers receive the assigned IP.
   response_export_values = [
     "properties.ipConfigurations",
     "properties.provisioningState",
