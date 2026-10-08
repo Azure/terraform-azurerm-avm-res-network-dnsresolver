@@ -33,13 +33,26 @@ and resends the assigned IP only when the endpoint name, subnet and allocation m
 New endpoints leave the IP unset so Azure can assign it. Explicit Static IP values take
 precedence. The deployment identity needs permission to list inbound endpoints on the resolver.
 
+Changing an inbound endpoint's subnet, allocation method or Static IP address replaces that
+endpoint, preserving the previous AzureRM lifecycle. The assigned IP of an unchanged Dynamic
+endpoint is not a replacement trigger. Replacement can interrupt DNS resolution; review the
+plan and update downstream DNS configuration if the assigned address changes.
+
 **Breaking changes.**
 
-- **Outputs.** `inbound_endpoints`, `outbound_endpoints`, `forwarding_rulesets` and `resource` now return discrete objects projected from the AzAPI response body rather than the `azurerm` resource schema. Consumers that indexed into `azurerm`-specific attribute names must be updated. `inbound_endpoint_ips`, `name` and `resource_id` are unchanged.
+- **Output shapes.** All top-level output names are unchanged. `inbound_endpoints`, `outbound_endpoints`, `forwarding_rulesets` and `resource` now return discrete objects assembled from AzAPI attributes and exported response fields rather than complete AzureRM resource objects. Their nested shapes are not backward-compatible. For example, use `inbound_endpoints[key].private_ip_address`, `.private_ip_allocation_method` and `.subnet_id` instead of `inbound_endpoints[key].ip_configurations[0]` fields. Provider-only fields such as `timeouts` are no longer exposed. `inbound_endpoint_ips`, `name` and `resource_id` retain their previous value shapes.
 - **`role_assignments[*].skip_service_principal_aad_check`** is accepted for compatibility but has no effect, because the underlying ARM API has no equivalent. Azure AD propagation delays are handled with `var.retry` instead.
 - **Tags** are now an AzAPI `Optional`/`Computed` attribute. Leaving `var.tags` unset no longer guarantees that tags placed on the resources out of band are removed. Manage tags explicitly if you rely on this module to own them.
 
 **New inputs.** `resource_types`, `ignore_body_changes`, `retry` and `timeouts` are new optional inputs that expose the AzAPI API version, per-resource ignored body paths, retry behaviour, and operation timeouts. All defaults preserve the previous behaviour.
+
+## Local regression checks
+
+Run `avm test unit` for provider-mocked assigned-IP selection tests. Run
+`pwsh -File tests\unit\Test-InboundEndpointPlans.ps1` for offline lifecycle plans with
+the real AzAPI provider. The latter uses synthetic AzAPI state and substitutes read-only
+lookups with fixture values. Neither suite proves AzureRM-to-AzAPI state conversion or
+live Azure behavior; those require a separately authorized upgrade-path test.
 
 ## Feedback
 - Your feedback is welcome! Please raise an issue or feature request on the module's GitHub repository.

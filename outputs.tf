@@ -1,19 +1,12 @@
-# Outputs are DISCRETE objects assembled from the `azapi_resource` attributes and from
-# `response_export_values`, not the whole provider resource object. This is a BREAKING change
-# for consumers who read AzureRM-only attributes off these outputs.
-
-
 output "forwarding_rulesets" {
-  description = "The forwarding rulesets of the DNS resolver, keyed by `\"<outbound endpoint key>-<ruleset name>\"`."
+  description = "Discrete forwarding ruleset objects, keyed by `\"<outbound endpoint key>-<ruleset name>\"`, rather than complete provider resource objects."
   value = {
     for key, ruleset in azapi_resource.forwarding_ruleset : key => {
-      id                  = ruleset.id
-      name                = ruleset.name
-      location            = ruleset.location
-      resource_group_name = var.resource_group_name
-      tags                = ruleset.tags
-      # Field name kept as AzureRM's `azurerm_private_dns_resolver_dns_forwarding_ruleset`
-      # spelled it: an in-place migration must not change the module's public interface.
+      id                                         = ruleset.id
+      name                                       = ruleset.name
+      location                                   = ruleset.location
+      resource_group_name                        = var.resource_group_name
+      tags                                       = ruleset.tags
       private_dns_resolver_outbound_endpoint_ids = try([for endpoint in ruleset.output.properties.dnsResolverOutboundEndpoints : endpoint.id], null)
       provisioning_state                         = try(ruleset.output.properties.provisioningState, null)
     }
@@ -26,7 +19,7 @@ output "inbound_endpoint_ips" {
 }
 
 output "inbound_endpoints" {
-  description = "The inbound endpoints of the DNS resolver."
+  description = "Discrete inbound endpoint objects, keyed by endpoint key, with subnet_id, private_ip_address and private_ip_allocation_method at the object level instead of a nested ip_configurations block."
   value = {
     for key, endpoint in azapi_resource.inbound_endpoint : key => {
       id                           = endpoint.id
@@ -48,7 +41,7 @@ output "name" {
 }
 
 output "outbound_endpoints" {
-  description = "The outbound endpoints of the DNS resolver."
+  description = "Discrete outbound endpoint objects, keyed by endpoint key, rather than complete provider resource objects."
   value = {
     for key, endpoint in azapi_resource.outbound_endpoint : key => {
       id                      = endpoint.id
@@ -63,19 +56,16 @@ output "outbound_endpoints" {
 }
 
 output "resource" {
-  description = "This is the full output for the resource."
+  description = "A discrete DNS resolver object containing id, name, location, resource_group_name, tags, virtual_network_id and exported state fields, rather than the complete provider resource object."
   value = {
     id                  = azapi_resource.this.id
     name                = azapi_resource.this.name
     location            = azapi_resource.this.location
     resource_group_name = var.resource_group_name
     tags                = azapi_resource.this.tags
-    # Field name kept as AzureRM's `azurerm_private_dns_resolver` spelled it (`virtual_network_id`),
-    # even though the module's own input variable is `virtual_network_resource_id`: an in-place
-    # migration must not change the module's public interface.
-    virtual_network_id = var.virtual_network_resource_id
-    dns_resolver_state = try(azapi_resource.this.output.properties.dnsResolverState, null)
-    provisioning_state = try(azapi_resource.this.output.properties.provisioningState, null)
+    virtual_network_id  = var.virtual_network_resource_id
+    dns_resolver_state  = try(azapi_resource.this.output.properties.dnsResolverState, null)
+    provisioning_state  = try(azapi_resource.this.output.properties.provisioningState, null)
   }
 }
 

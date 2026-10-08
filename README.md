@@ -34,13 +34,26 @@ and resends the assigned IP only when the endpoint name, subnet and allocation m
 New endpoints leave the IP unset so Azure can assign it. Explicit Static IP values take
 precedence. The deployment identity needs permission to list inbound endpoints on the resolver.
 
+Changing an inbound endpoint's subnet, allocation method or Static IP address replaces that
+endpoint, preserving the previous AzureRM lifecycle. The assigned IP of an unchanged Dynamic
+endpoint is not a replacement trigger. Replacement can interrupt DNS resolution; review the
+plan and update downstream DNS configuration if the assigned address changes.
+
 **Breaking changes.**
 
-- **Outputs.** `inbound_endpoints`, `outbound_endpoints`, `forwarding_rulesets` and `resource` now return discrete objects projected from the AzAPI response body rather than the `azurerm` resource schema. Consumers that indexed into `azurerm`-specific attribute names must be updated. `inbound_endpoint_ips`, `name` and `resource_id` are unchanged.
+- **Output shapes.** All top-level output names are unchanged. `inbound_endpoints`, `outbound_endpoints`, `forwarding_rulesets` and `resource` now return discrete objects assembled from AzAPI attributes and exported response fields rather than complete AzureRM resource objects. Their nested shapes are not backward-compatible. For example, use `inbound_endpoints[key].private_ip_address`, `.private_ip_allocation_method` and `.subnet_id` instead of `inbound_endpoints[key].ip_configurations[0]` fields. Provider-only fields such as `timeouts` are no longer exposed. `inbound_endpoint_ips`, `name` and `resource_id` retain their previous value shapes.
 - **`role_assignments[*].skip_service_principal_aad_check`** is accepted for compatibility but has no effect, because the underlying ARM API has no equivalent. Azure AD propagation delays are handled with `var.retry` instead.
 - **Tags** are now an AzAPI `Optional`/`Computed` attribute. Leaving `var.tags` unset no longer guarantees that tags placed on the resources out of band are removed. Manage tags explicitly if you rely on this module to own them.
 
 **New inputs.** `resource_types`, `ignore_body_changes`, `retry` and `timeouts` are new optional inputs that expose the AzAPI API version, per-resource ignored body paths, retry behaviour, and operation timeouts. All defaults preserve the previous behaviour.
+
+## Local regression checks
+
+Run `avm test unit` for provider-mocked assigned-IP selection tests. Run
+`pwsh -File tests\unit\Test-InboundEndpointPlans.ps1` for offline lifecycle plans with
+the real AzAPI provider. The latter uses synthetic AzAPI state and substitutes read-only
+lookups with fixture values. Neither suite proves AzureRM-to-AzAPI state conversion or
+live Azure behavior; those require a separately authorized upgrade-path test.
 
 ## Feedback
 - Your feedback is welcome! Please raise an issue or feature request on the module's GitHub repository.
@@ -400,7 +413,7 @@ The following outputs are exported:
 
 ### <a name="output_forwarding_rulesets"></a> [forwarding\_rulesets](#output\_forwarding\_rulesets)
 
-Description: The forwarding rulesets of the DNS resolver, keyed by `"<outbound endpoint key>-<ruleset name>"`.
+Description: Discrete forwarding ruleset objects, keyed by `"<outbound endpoint key>-<ruleset name>"`, rather than complete provider resource objects.
 
 ### <a name="output_inbound_endpoint_ips"></a> [inbound\_endpoint\_ips](#output\_inbound\_endpoint\_ips)
 
@@ -408,7 +421,7 @@ Description: The IP addresses of the inbound endpoints.
 
 ### <a name="output_inbound_endpoints"></a> [inbound\_endpoints](#output\_inbound\_endpoints)
 
-Description: The inbound endpoints of the DNS resolver.
+Description: Discrete inbound endpoint objects, keyed by endpoint key, with subnet\_id, private\_ip\_address and private\_ip\_allocation\_method at the object level instead of a nested ip\_configurations block.
 
 ### <a name="output_name"></a> [name](#output\_name)
 
@@ -416,11 +429,11 @@ Description: The name of the DNS resolver.
 
 ### <a name="output_outbound_endpoints"></a> [outbound\_endpoints](#output\_outbound\_endpoints)
 
-Description: The outbound endpoints of the DNS resolver.
+Description: Discrete outbound endpoint objects, keyed by endpoint key, rather than complete provider resource objects.
 
 ### <a name="output_resource"></a> [resource](#output\_resource)
 
-Description: This is the full output for the resource.
+Description: A discrete DNS resolver object containing id, name, location, resource\_group\_name, tags, virtual\_network\_id and exported state fields, rather than the complete provider resource object.
 
 ### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
 

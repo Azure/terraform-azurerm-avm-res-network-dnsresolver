@@ -9,6 +9,7 @@
 !tests/unit/
 tests/unit/*
 !tests/unit/*.tftest.hcl
+!tests/unit/Test-InboundEndpointPlans.ps1
 
 # Crash log files
 crash.log

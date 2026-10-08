@@ -89,9 +89,11 @@ resource "azapi_resource" "inbound_endpoint" {
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_resolvers_inbound_endpoints) > 0 ? var.ignore_body_changes.network_dns_resolvers_inbound_endpoints : null
   ignore_null_property = true
   read_headers         = local.azapi_headers
-  # Watch the subnet rather than the whole list, which also contains the server-assigned IP.
+  # Preserve AzureRM's IP-configuration replacement semantics without tracking assigned Dynamic IPs.
   replace_triggers_refs = [
     "properties.ipConfigurations[0].subnet.id",
+    "properties.ipConfigurations[0].privateIpAllocationMethod",
+    "properties.ipConfigurations[?privateIpAllocationMethod == 'Static'].privateIpAddress",
   ]
   # Refresh these exports at adoption so downstream DNS consumers receive the assigned IP.
   response_export_values = [
