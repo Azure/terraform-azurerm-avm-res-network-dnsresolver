@@ -55,15 +55,6 @@ resource "azapi_resource" "this" {
   }
 }
 
-data "azapi_resource_list" "inbound_endpoints" {
-  count = length(var.inbound_endpoints) > 0 ? 1 : 0
-
-  parent_id              = azapi_resource.this.id
-  type                   = var.resource_types.network_dns_resolvers_inbound_endpoints
-  response_export_values = ["value"]
-  retry                  = var.retry
-}
-
 resource "azapi_resource" "inbound_endpoint" {
   for_each = var.inbound_endpoints
 
@@ -78,7 +69,9 @@ resource "azapi_resource" "inbound_endpoint" {
           subnet = {
             id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
           }
-          privateIpAddress          = local.inbound_endpoint_private_ip_addresses[each.key]
+          # Validation limits this to Static endpoints. A Dynamic IP is assigned by Azure and is
+          # never read back into the body, so a refresh after create cannot introduce a diff.
+          privateIpAddress          = each.value.private_ip_address
           privateIpAllocationMethod = each.value.private_ip_allocation_method
         }
       ]

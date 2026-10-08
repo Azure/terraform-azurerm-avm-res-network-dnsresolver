@@ -3,8 +3,8 @@
 Runs offline inbound endpoint plan regressions with the real AzAPI provider.
 .DESCRIPTION
 Synthetic AzAPI state is built from provider-mocked Terraform test results.
-Read-only data lookups are replaced with literal fixture values; the existing
-mocked tests separately exercise endpoint matching and assigned-IP selection.
+The client-config lookup is replaced with literal fixture values. Adopted and
+refreshed state shapes are synthesized explicitly by each case.
 Only init, mocked tests, show and refresh-disabled plans run. Azure endpoints
 and authentication are directed to an unused loopback port. These checks do
 not prove cross-provider state moves, ARM update semantics or live convergence.
@@ -50,7 +50,7 @@ function Get-DynamicType {
 }
 
 function New-SyntheticState {
-    param($Seed)
+    param($Seed, [hashtable] $Case)
     $resources = foreach ($resource in ($Seed.root_module.resources | Where-Object mode -eq managed)) {
         $schema = $Seed.provider_schemas[$resource.provider_name]
         $block = $schema.resource_schemas[$resource.type].block
@@ -68,6 +68,19 @@ function New-SyntheticState {
         }
         if ($resource.type -eq 'azapi_resource' -and $resource.name -eq 'inbound_endpoint') {
             $attributes.id = "$($attributes.parent_id)/inboundEndpoints/$($attributes.name)"
+            $configuration = $attributes.body.properties.ipConfigurations[0]
+            if ($Case.ContainsKey('StateBodyIP')) { $configuration.privateIpAddress = $Case.StateBodyIP }
+            # Refreshed AzAPI state keeps the request body shape and exports the assigned IP.
+            $attributes.output = @{
+                properties = @{
+                    ipConfigurations = @(@{
+                        privateIpAddress          = $(if ($Case.ContainsKey('RemoteIP')) { $Case.RemoteIP } else { $configuration.privateIpAddress })
+                        privateIpAllocationMethod = $configuration.privateIpAllocationMethod
+                        subnet                    = @{ id = $configuration.subnet.id }
+                    })
+                    provisioningState = 'Succeeded'
+                }
+            }
         }
         foreach ($key in @($attributes.Keys)) {
             if ($block.attributes[$key].type -eq 'dynamic' -and $null -ne $attributes[$key]) {
@@ -106,25 +119,20 @@ try {
     Set-Location $modulePath
     $events = Invoke-Terraform -Arguments @(
         'test', '-test-directory=tests\unit',
-        '-filter=tests\unit\dynamic_ip_preservation.tftest.hcl', '-verbose', '-json'
+        '-filter=tests\unit\inbound_endpoint_ip.tftest.hcl', '-verbose', '-json'
     ) -LogName 'mocked-seeds.jsonl'
     $seeds = @{}
     foreach ($line in $events) {
         $event = $line | ConvertFrom-Json -AsHashtable -Depth 100
         if ($event.type -eq 'test_state') { $seeds[$event.'@testrun'] = $event.test_state }
     }
-    if (!$seeds.ContainsKey('existing_dynamic_ip_is_preserved') -or !$seeds.ContainsKey('explicit_static_ip_is_honored')) {
+    if (!$seeds.ContainsKey('dynamic_endpoint_leaves_ip_unset') -or !$seeds.ContainsKey('explicit_static_ip_is_honored')) {
         throw 'The mocked tests did not produce both required seed states.'
     }
 
     Copy-Item (Join-Path $modulePath '*.tf') $sandbox
     # Consumer-only provider configuration. Any accidental network request fails locally.
     @'
-variable "offline_private_ip_address" {
-  type    = string
-  default = null
-}
-
 provider "azapi" {
   subscription_id            = "00000000-0000-0000-0000-000000000001"
   tenant_id                  = "00000000-0000-0000-0000-000000000002"
@@ -150,15 +158,8 @@ data "azapi_client_config" "current" {
   count = 0
 }
 
-data "azapi_resource_list" "inbound_endpoints" {
-  count = 0
-}
-
 locals {
   resource_group_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test"
-  inbound_endpoint_private_ip_addresses = {
-    dns = var.offline_private_ip_address
-  }
 }
 
 module "interfaces" {
@@ -171,19 +172,24 @@ module "interfaces" {
     Set-Location $sandbox
     $null = Invoke-Terraform -Arguments @('init', '-backend=false', '-input=false', '-no-color') -LogName 'init.log'
 
+    # StateBodyIP set: adopted state, whose body is read back from Azure and includes the assigned IP.
+    # StateBodyIP null: state written by this module's own create, whose body has no Dynamic IP.
+    # ignore_no_op_changes is disabled, so these plans show raw body differences without a GET.
     $cases = @(
-        @{ Name = 'dynamic_to_static'; Seed = 'existing_dynamic_ip_is_preserved'; Method = 'Static'; IP = '10.0.4.70'; Actions = 'delete,create' }
-        @{ Name = 'static_to_dynamic'; Seed = 'explicit_static_ip_is_honored'; Method = 'Dynamic'; IP = $null; Actions = 'delete,create' }
-        @{ Name = 'static_address_edit'; Seed = 'explicit_static_ip_is_honored'; Method = 'Static'; IP = '10.0.4.71'; Actions = 'delete,create' }
-        @{ Name = 'unchanged_adopted_dynamic'; Seed = 'existing_dynamic_ip_is_preserved'; Method = 'Dynamic'; IP = $null; Actions = 'no-op'; BodyIP = '10.0.4.68' }
-        @{ Name = 'unchanged_static'; Seed = 'explicit_static_ip_is_honored'; Method = 'Static'; IP = '10.0.4.70'; Actions = 'no-op'; BodyIP = '10.0.4.70' }
-        @{ Name = 'dynamic_tag_edit'; Seed = 'existing_dynamic_ip_is_preserved'; Method = 'Dynamic'; IP = $null; Actions = 'update'; BodyIP = '10.0.4.68'; Tags = @{ changed = 'true' } }
-        @{ Name = 'dynamic_subnet_edit'; Seed = 'existing_dynamic_ip_is_preserved'; Method = 'Dynamic'; IP = $null; Actions = 'delete,create'; Subnet = 'different-subnet' }
-        @{ Name = 'dynamic_assigned_ip_is_not_a_trigger'; Seed = 'existing_dynamic_ip_is_preserved'; Method = 'Dynamic'; IP = $null; Actions = 'update'; BodyIP = '10.0.4.69' }
+        @{ Name = 'dynamic_to_static'; Seed = 'dynamic_endpoint_leaves_ip_unset'; Method = 'Static'; IP = '10.0.4.70'; Actions = 'delete,create'; StateBodyIP = '10.0.4.68'; AfterIP = '10.0.4.70' }
+        @{ Name = 'static_to_dynamic'; Seed = 'explicit_static_ip_is_honored'; Method = 'Dynamic'; IP = $null; Actions = 'delete,create'; AfterIP = $null }
+        @{ Name = 'static_address_edit'; Seed = 'explicit_static_ip_is_honored'; Method = 'Static'; IP = '10.0.4.71'; Actions = 'delete,create'; AfterIP = '10.0.4.71' }
+        @{ Name = 'unchanged_static'; Seed = 'explicit_static_ip_is_honored'; Method = 'Static'; IP = '10.0.4.70'; Actions = 'no-op'; AfterIP = '10.0.4.70' }
+        @{ Name = 'dynamic_subnet_edit'; Seed = 'dynamic_endpoint_leaves_ip_unset'; Method = 'Dynamic'; IP = $null; Actions = 'delete,create'; Subnet = 'different-subnet'; AfterIP = $null }
+        # Live regression: create leaves the body IP null, then the next plan sees the Azure-assigned IP.
+        @{ Name = 'fresh_dynamic_create_then_refresh'; Seed = 'dynamic_endpoint_leaves_ip_unset'; Method = 'Dynamic'; IP = $null; Actions = 'no-op'; StateBodyIP = $null; RemoteIP = '10.0.4.68'; AfterIP = $null }
+        @{ Name = 'fresh_dynamic_tag_edit'; Seed = 'dynamic_endpoint_leaves_ip_unset'; Method = 'Dynamic'; IP = $null; Actions = 'update'; StateBodyIP = $null; RemoteIP = '10.0.4.68'; Tags = @{ changed = 'true' }; AfterIP = $null }
+        # Adoption drops the read-back IP with an in-place update; the assigned IP is never a replacement trigger.
+        @{ Name = 'adopted_dynamic_is_not_replaced'; Seed = 'dynamic_endpoint_leaves_ip_unset'; Method = 'Dynamic'; IP = $null; Actions = 'update'; StateBodyIP = '10.0.4.68'; AfterIP = $null }
     )
     $results = foreach ($case in $cases) {
         $seed = $seeds[$case.Seed] | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable -Depth 100
-        New-SyntheticState $seed | ConvertTo-Json -Depth 100 | Set-Content 'terraform.tfstate'
+        New-SyntheticState $seed $case | ConvertTo-Json -Depth 100 | Set-Content 'terraform.tfstate'
         $endpoint = @{
             subnet_name                  = 'dns'
             private_ip_allocation_method = $case.Method
@@ -198,7 +204,6 @@ module "interfaces" {
             virtual_network_resource_id = '/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/vnet-test'
             enable_telemetry            = $false
             inbound_endpoints           = @{ dns = $endpoint }
-            offline_private_ip_address  = $(if ($case.ContainsKey('BodyIP')) { $case.BodyIP } else { $case.IP })
         } | ConvertTo-Json -Depth 100 | Set-Content 'case.tfvars.json'
         $null = Invoke-Terraform -Arguments @(
             'plan', '-refresh=false', '-input=false', '-no-color',
@@ -210,12 +215,8 @@ module "interfaces" {
         if ($null -eq $change) { throw "No inbound endpoint change was present in $($case.Name)." }
         $actions = $change.change.actions
         $passed = ($actions -join ',') -eq $case.Actions
-        if ($case.ContainsKey('BodyIP')) {
-            $passed = $passed -and ($change.change.after.body.properties.ipConfigurations[0].privateIpAddress -eq $case.BodyIP)
-        }
-        if ($case.Name -in @('static_to_dynamic', 'dynamic_subnet_edit')) {
-            $passed = $passed -and ($null -eq $change.change.after.body.properties.ipConfigurations[0].privateIpAddress)
-        }
+        $afterIP = $change.change.after.body.properties.ipConfigurations[0].privateIpAddress
+        $passed = $passed -and ($(if ($null -eq $case.AfterIP) { $null -eq $afterIP } else { $afterIP -eq $case.AfterIP }))
         [pscustomobject]@{
             Case = $case.Name
             Actions = $actions -join ','

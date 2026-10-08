@@ -28,10 +28,11 @@ This module now creates every Azure resource with the [`azapi`](https://registry
 
 **Expected upgrade plan.** The upgrade is designed to produce no unintended destroys or replacements. Review in-place updates before applying; they reconcile the API version recorded by the state move and populate exported response values.
 
-For an existing Dynamic inbound endpoint, the module lists inbound endpoints before its update
-and resends the assigned IP only when the endpoint name, subnet and allocation method match.
-New endpoints leave the IP unset so Azure can assign it. Explicit Static IP values take
-precedence. The deployment identity needs permission to list inbound endpoints on the resolver.
+Dynamic inbound endpoints never send `privateIpAddress`, and the module does not read the
+assigned IP back into the request body, so a new Dynamic endpoint converges after its first
+refresh. Only Static endpoints send their configured IP. After the upgrade, an adopted
+Dynamic endpoint may plan a one-time in-place update that drops the read-back IP from the
+request body; it is not a replacement.
 
 Changing an inbound endpoint's subnet, allocation method or Static IP address replaces that
 endpoint, preserving the previous AzureRM lifecycle. The assigned IP of an unchanged Dynamic
@@ -48,10 +49,10 @@ plan and update downstream DNS configuration if the assigned address changes.
 
 ## Local regression checks
 
-Run `avm test unit` for provider-mocked assigned-IP selection tests. Run
+Run `avm test unit` for provider-mocked inbound IP request-body tests. Run
 `pwsh -File tests\unit\Test-InboundEndpointPlans.ps1` for offline lifecycle plans with
-the real AzAPI provider. The latter uses synthetic AzAPI state and substitutes read-only
-lookups with fixture values. Neither suite proves AzureRM-to-AzAPI state conversion or
+the real AzAPI provider. The latter uses synthetic AzAPI state, including a fresh Dynamic
+create followed by a refresh that returns the assigned IP. Neither suite proves AzureRM-to-AzAPI state conversion or
 live Azure behavior; those require a separately authorized upgrade-path test.
 
 ## Feedback

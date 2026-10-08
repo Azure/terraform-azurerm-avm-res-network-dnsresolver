@@ -36,22 +36,6 @@ locals {
 }
 
 locals {
-  # AzureRM updates resend the assigned Dynamic IP. Preserve it only for the same endpoint and subnet.
-  inbound_endpoint_private_ip_addresses = {
-    for key, endpoint in var.inbound_endpoints : key => (
-      endpoint.private_ip_address != null || endpoint.private_ip_allocation_method != "Dynamic"
-      ? endpoint.private_ip_address
-      : one(flatten([
-        for existing in data.azapi_resource_list.inbound_endpoints[0].output.value : [
-          for configuration in existing.properties.ipConfigurations : configuration.privateIpAddress
-          if configuration.privateIpAllocationMethod == "Dynamic" &&
-          lower(configuration.subnet.id) == lower("${var.virtual_network_resource_id}/subnets/${endpoint.subnet_name}")
-        ]
-        if lower(existing.name) == lower(coalesce(endpoint.name, "in-${key}-dnsResolver-inbound"))
-      ]))
-    )
-  }
-
   # Tag resolution for the child resources, lifted out of `main.tf` unchanged so the
   # merge-with-module-tags behaviour is identical to the AzureRM implementation.
   forwarding_ruleset_tags = {
