@@ -8,6 +8,14 @@ This is a module for linking existing vnets to an existing forwarding ruleset in
 This module is used to link existing vnets to an existing forwarding ruleset in an Azure Private DNS Resolver outbound endpoint. It is usefull when you want to decouple the dns resolver resources from the linking of vnets to the forwarding ruleset. it supports:
 - linking a single vnet to a single forwarding ruleset
 
+## Provider Migration (AzureRM to AzAPI)
+
+This module now creates its virtual network links with the [`azapi`](https://registry.terraform.io/providers/Azure/azapi/latest) provider. The `azurerm` provider is no longer required and is no longer declared.
+
+An in-module `moved` block migrates the existing state automatically. Run `terraform init -upgrade` and then `terraform plan` **with refresh enabled** (the default), and review the plan before applying. The upgrade is designed to produce no destroys and no replacements; an in-place update on the migrated links is expected. Link names are unchanged.
+
+`resource_types`, `ignore_body_changes`, `retry` and `timeouts` are new optional inputs. All defaults preserve the previous behaviour.
+
 ## Feedback
 - Your feedback is welcome! Please raise an issue or feature request on the module's GitHub repository.
 
@@ -20,13 +28,11 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 4.0)
-
 ## Resources
 
 The following resources are used by this module:
 
-- [azurerm_private_dns_resolver_virtual_network_link.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_virtual_network_link) (resource)
+- [azapi_resource.this](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs
@@ -55,7 +61,91 @@ map(object({
 
 ## Optional Inputs
 
-No optional inputs.
+The following input variables are optional (have default values):
+
+### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
+
+Description: (Optional) Body property paths whose changes the `azapi` provider ignores after creation, letting an out-of-band controller own those properties without producing perpetual `terraform plan` drift.
+
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) Ignored body paths for the virtual network links, in dot notation relative to the request body, for example `["properties.metadata"]`. Default `[]`.
+
+While a path is ignored, configuration changes at that path are no longer sent to Azure. The value is write-only provider state, so a change only takes effect after an `apply`, and supplying a non-empty list requires Terraform 1.11 or later. An empty list is collapsed to `null` before it reaches the provider.
+
+Type:
+
+```hcl
+object({
+    network_dns_forwarding_rulesets_virtual_network_links = optional(list(string), [])
+  })
+```
+
+Default: `{}`
+
+### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
+
+Description: (Optional) The Azure resource type and API version used for each resource created by this module.
+
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) The type and API version of the virtual network links. Default `Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01`.
+
+Type:
+
+```hcl
+object({
+    network_dns_forwarding_rulesets_virtual_network_links = optional(string, "Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01")
+  })
+```
+
+Default: `{}`
+
+### <a name="input_retry"></a> [retry](#input\_retry)
+
+Description: (Optional) The retry configuration applied to every `azapi_resource` created by this module.
+
+- `error_message_regex` - (Optional) A list of regular expressions matched against the error message. The request is retried when any of them matches. The AzAPI provider requires this attribute, so it cannot be `null`; pass `[]` to disable retries. The default covers `AnotherOperationInProgress` (a concurrent write against the same forwarding ruleset or virtual network), `ReferencedResourceNotProvisioned` (the virtual network is still provisioning) and `CannotDeleteResource` (on teardown, ARM still reports a nested resource as present after its `DELETE` has already completed).
+- `interval_seconds` - (Optional) The base number of seconds to wait between retries. Defaults to the AzAPI provider default (`10`).
+- `max_interval_seconds` - (Optional) The maximum number of seconds to wait between retries. Defaults to the AzAPI provider default (`180`).
+
+Type:
+
+```hcl
+object({
+    error_message_regex = optional(list(string), [
+      "AnotherOperationInProgress",
+      "ReferencedResourceNotProvisioned",
+      "CannotDeleteResource",
+    ])
+    interval_seconds     = optional(number, null)
+    max_interval_seconds = optional(number, null)
+  })
+```
+
+Default: `{}`
+
+### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
+
+Description: (Optional) Timeouts for the resource operations. Each value must be a string parsable as a Go duration, for example `"30s"`, `"5m"` or `"1h30m"`.
+
+Any attribute left unset falls back to the timeout default of `azurerm_private_dns_resolver_virtual_network_link`: create 30m, read 5m, update 30m, delete 30m. The fallbacks live in `local.timeouts` in `locals.tf`.
+
+Set the whole object to `null` to omit the `timeouts` block entirely and use the AzAPI provider defaults.
+
+- `create` - (Optional) Timeout for create operations.
+- `read` - (Optional) Timeout for read operations.
+- `update` - (Optional) Timeout for update operations.
+- `delete` - (Optional) Timeout for delete operations.
+
+Type:
+
+```hcl
+object({
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
+  })
+```
+
+Default: `{}`
 
 ## Outputs
 
