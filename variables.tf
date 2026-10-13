@@ -112,7 +112,7 @@ variable "outbound_endpoints" {
         destination_ip_addresses = map(string)
         enabled                  = optional(bool, true)
         metadata                 = optional(map(string), null)
-      })))
+      })), {})
     })))
   }))
   default     = {}
@@ -135,7 +135,7 @@ A map of outbound endpoints to create for this DNS resolver.
     - `name` - (Optional) The name of the additional virtual network link.
     - `vnet_id` - (Required) The ID of the virtual network to link to.
     - `metadata` - (Optional) A map of metadata to associate with the virtual network link.
-  - `rules` - (Optional) A map of forwarding rules to create for the forwarding ruleset.
+  - `rules` - (Optional) A map of forwarding rules to create for the forwarding ruleset. Defaults to an empty map.
     - `name` - (Optional) The name of the forwarding rule.
     - `domain_name` - (Required) The domain name to forward.
     - `destination_ip_addresses` - (Required) A map where the key is the IP address and the value is the port.

@@ -1,6 +1,11 @@
 variable "dns_forwarding_ruleset_id" {
   type        = string
   description = "The ID of the DNS forwarding ruleset to link to the virtual networks."
+
+  validation {
+    condition     = can(provider::azapi::parse_resource_id("Microsoft.Network/dnsForwardingRulesets", var.dns_forwarding_ruleset_id))
+    error_message = "dns_forwarding_ruleset_id must be a valid DNS forwarding ruleset resource ID."
+  }
 }
 
 variable "virtual_networks" {
