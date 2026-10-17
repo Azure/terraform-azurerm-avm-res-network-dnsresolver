@@ -1,8 +1,16 @@
 mock_provider "azurerm" {}
-mock_provider "azapi" {}
+mock_provider "azapi" {
+  mock_data "azapi_client_config" {
+    defaults = {
+      subscription_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    }
+  }
+}
+mock_provider "terraform" {}
 
 variables {
   dns_forwarding_ruleset_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset"
+  location                  = "northeurope"
   virtual_networks = {
     spoke = {
       vnet_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/spoke"
@@ -15,8 +23,9 @@ run "virtual_network_links" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   assert {
@@ -33,8 +42,9 @@ run "invalid_ruleset_id" {
   command = plan
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
