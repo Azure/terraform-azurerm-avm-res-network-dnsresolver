@@ -10,8 +10,5 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.36"
     }
-    terraform = {
-      source = "terraform.io/builtin/terraform"
-    }
   }
 }
