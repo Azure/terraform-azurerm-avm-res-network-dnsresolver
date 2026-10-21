@@ -90,15 +90,6 @@ module "private_resolver" {
             "rules" = "internet"
           }
           merge_with_module_tags = true
-          additional_virtual_network_links = {
-            "vnet2" = {
-              vnet_id = azurerm_virtual_network.vnet2.id
-              metadata = {
-                "type" = "spoke"
-                "env"  = "dev"
-              }
-            }
-          }
           rules = {
             "rule1" = {
               name        = "rule1"
@@ -129,4 +120,21 @@ module "private_resolver" {
   tags = {
     "environment" = "test"
   }
+}
+
+module "ruleset_vnet_link" {
+  source = "../../modules/ruleset_vnet_link"
+
+  dns_forwarding_ruleset_id = module.private_resolver.forwarding_rulesets["outbound1-ruleset1"].id
+  location                  = local.location
+  virtual_networks = {
+    vnet2 = {
+      vnet_id = azurerm_virtual_network.vnet2.id
+      metadata = {
+        type = "spoke"
+        env  = "dev"
+      }
+    }
+  }
+  enable_telemetry = var.enable_telemetry
 }

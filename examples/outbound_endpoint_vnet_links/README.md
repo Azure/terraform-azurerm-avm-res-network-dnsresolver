@@ -97,15 +97,6 @@ module "private_resolver" {
             "rules" = "internet"
           }
           merge_with_module_tags = true
-          additional_virtual_network_links = {
-            "vnet2" = {
-              vnet_id = azurerm_virtual_network.vnet2.id
-              metadata = {
-                "type" = "spoke"
-                "env"  = "dev"
-              }
-            }
-          }
           rules = {
             "rule1" = {
               name        = "rule1"
@@ -136,6 +127,23 @@ module "private_resolver" {
   tags = {
     "environment" = "test"
   }
+}
+
+module "ruleset_vnet_link" {
+  source = "../../modules/ruleset_vnet_link"
+
+  dns_forwarding_ruleset_id = module.private_resolver.forwarding_rulesets["outbound1-ruleset1"].id
+  location                  = local.location
+  virtual_networks = {
+    vnet2 = {
+      vnet_id = azurerm_virtual_network.vnet2.id
+      metadata = {
+        type = "spoke"
+        env  = "dev"
+      }
+    }
+  }
+  enable_telemetry = var.enable_telemetry
 }
 ```
 
@@ -180,7 +188,11 @@ Default: `true`
 
 ## Outputs
 
-No outputs.
+The following outputs are exported:
+
+### <a name="output_vnet2_link_resource_id"></a> [vnet2\_link\_resource\_id](#output\_vnet2\_link\_resource\_id)
+
+Description: The resource ID of the direct child-module link for vnet2.
 
 ## Modules
 
@@ -189,6 +201,12 @@ The following Modules are called:
 ### <a name="module_private_resolver"></a> [private\_resolver](#module\_private\_resolver)
 
 Source: ../../
+
+Version:
+
+### <a name="module_ruleset_vnet_link"></a> [ruleset\_vnet\_link](#module\_ruleset\_vnet\_link)
+
+Source: ../../modules/ruleset_vnet_link
 
 Version:
 
