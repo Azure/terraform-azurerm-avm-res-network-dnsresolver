@@ -15,9 +15,16 @@ mock_provider "azurerm" {
     }
   }
 }
-mock_provider "azapi" {}
-mock_provider "modtm" {}
-mock_provider "random" {}
+
+mock_provider "azapi" {
+  mock_data "azapi_client_config" {
+    defaults = {
+      subscription_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+    }
+  }
+}
+
+mock_provider "terraform" {}
 
 variables {
   location                    = "northeurope"
@@ -31,10 +38,9 @@ run "defaults" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   assert {
@@ -46,7 +52,7 @@ run "defaults" {
     error_message = "Optional endpoints and rulesets must be absent by default."
   }
   assert {
-    condition     = length(modtm_telemetry.telemetry) == 0 && length(azurerm_management_lock.this) == 0 && length(azurerm_role_assignment.dnsresolver) == 0
+    condition     = length(azapi_resource.telemetry) == 0 && length(terraform_data.telemetry) == 0 && length(data.azapi_client_config.telemetry) == 0 && length(azurerm_management_lock.this) == 0 && length(azurerm_role_assignment.dnsresolver) == 0
     error_message = "Disabled telemetry and unconfigured locks and assignments must not create resources."
   }
 }
@@ -55,10 +61,9 @@ run "telemetry_enabled" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
@@ -66,7 +71,7 @@ run "telemetry_enabled" {
   }
 
   assert {
-    condition     = length(modtm_telemetry.telemetry) == 1 && length(data.azapi_client_config.telemetry) == 1 && length(random_uuid.telemetry) == 1
+    condition     = length(azapi_resource.telemetry) == 1 && length(data.azapi_client_config.telemetry) == 1 && length(terraform_data.telemetry) == 1
     error_message = "Enabled telemetry must use the mocked providers."
   }
 }
@@ -75,10 +80,9 @@ run "endpoints_rules_and_links" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
@@ -134,10 +138,9 @@ run "optional_rules" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
@@ -161,10 +164,9 @@ run "locks_and_role_assignments" {
   command = apply
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
@@ -208,10 +210,9 @@ run "invalid_lock" {
   command = plan
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
@@ -225,10 +226,9 @@ run "invalid_name" {
   command = plan
 
   providers = {
-    azurerm = azurerm
-    azapi   = azapi
-    modtm   = modtm
-    random  = random
+    azurerm   = azurerm
+    azapi     = azapi
+    terraform = terraform
   }
 
   variables {
