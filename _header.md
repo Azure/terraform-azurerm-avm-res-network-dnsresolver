@@ -23,6 +23,8 @@ This module now creates every Azure resource with the [`azapi`](https://registry
 
 **What you must do when upgrading.** Remove the `azurerm` provider from the `required_providers` of any configuration that only declared it for this module, and add `Azure/azapi`. The module carries in-module `moved` blocks for every resource it owns, so the existing state is migrated automatically: run `terraform init -upgrade` and then `terraform plan`, and review the plan before applying.
 
+**Breaking input change.** The module now requires `parent_id`, the fully-qualified ARM ID of the existing resource group. Replace `resource_group_name` with the resource group's ID (for example, `azapi_resource.resource_group.id`) in every module call.
+
 > [!IMPORTANT]
 > Run the upgrade plan **with refresh enabled** (the default). The state move records only the resource identity; the provider reads the rest of each resource body back from Azure during the refresh. Planning the upgrade with `-refresh=false` can produce spurious replacements.
 

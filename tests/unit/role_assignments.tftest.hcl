@@ -32,8 +32,7 @@ override_resource {
 }
 
 override_data {
-  # The lookup scope itself (the resource group) is set in `main.tf` and is proven live, because a
-  # mocked data source cannot show which scope it was asked for.
+
   target = module.interfaces.data.azapi_resource_list.role_definitions[0]
   values = {
     output = {
@@ -53,7 +52,7 @@ override_data {
 
 variables {
   name                        = "resolver-test"
-  resource_group_name         = "rg-test"
+  parent_id                   = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test"
   location                    = "eastus"
   virtual_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/vnet-test"
   enable_telemetry            = false

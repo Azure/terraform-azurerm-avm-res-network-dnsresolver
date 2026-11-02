@@ -19,7 +19,7 @@ override_resource {
 
 variables {
   name                        = "resolver-test"
-  resource_group_name         = "rg-test"
+  parent_id                   = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test"
   location                    = "eastus"
   virtual_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000001/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/vnet-test"
   enable_telemetry            = false

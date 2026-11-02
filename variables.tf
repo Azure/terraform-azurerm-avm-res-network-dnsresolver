@@ -14,10 +14,15 @@ variable "name" {
   }
 }
 
-# This is required for most resource modules
-variable "resource_group_name" {
+variable "parent_id" {
   type        = string
-  description = "The resource group where the resources will be deployed."
+  description = "The fully-qualified ARM resource ID of the existing resource group into which the DNS resolver and forwarding rulesets will be deployed."
+  nullable    = false
+
+  validation {
+    condition     = can(provider::azapi::parse_resource_id("Microsoft.Resources/resourceGroups", var.parent_id))
+    error_message = "`parent_id` must be a valid `Microsoft.Resources/resourceGroups` resource ID."
+  }
 }
 
 variable "virtual_network_resource_id" {
@@ -28,8 +33,7 @@ For more information on how to configure subnets for inbound and outbounbd endpo
 DESCRIPTION
 
   validation {
-    # TFNFR38 (Severity-MUST): validate a resource ID with a LITERAL type through
-    # `provider::azapi::parse_resource_id`, never with a hand-rolled regex.
+
     condition = (
       can(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", var.virtual_network_resource_id)) &&
       try(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", var.virtual_network_resource_id).resource_group_name, "") != ""
@@ -114,9 +118,7 @@ DESCRIPTION
     error_message = "`inbound_endpoints[*].private_ip_allocation_method` must be either `Dynamic` or `Static`."
   }
   validation {
-    # Reproduces the check AzureRM performed in `expandIPConfigurationModel`, which failed at
-    # apply time. Failing at plan time is strictly better, and AzAPI would otherwise send the
-    # request straight to ARM.
+
     condition     = alltrue([for endpoint in var.inbound_endpoints : !(endpoint.private_ip_allocation_method == "Dynamic" && endpoint.private_ip_address != null)])
     error_message = "`inbound_endpoints[*].private_ip_address` must not be set when `private_ip_allocation_method` is `Dynamic`."
   }
@@ -209,7 +211,7 @@ DESCRIPTION
   nullable    = false
 
   validation {
-    # TFNFR38 (Severity-MUST): a LITERAL type through `parse_resource_id`, never a regex.
+
     condition = alltrue(flatten([
       for endpoint in var.outbound_endpoints : [
         for ruleset in coalesce(endpoint.forwarding_ruleset, {}) : [

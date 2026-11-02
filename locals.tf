@@ -1,18 +1,8 @@
-# Deafult locals
-
 locals {
-  # The location where the resources will be created
   location = var.location
-  # The resource group that hosts the DNS resolver and the forwarding rulesets. AzAPI addresses
-  # a resource by its parent scope rather than by a `resource_group_name` argument.
-  resource_group_resource_id = "/subscriptions/${data.azapi_client_config.current.subscription_id}/resourceGroups/${var.resource_group_name}"
 }
 
 locals {
-  # Per-resource timeout fallbacks. Every resource this module replaced -- the six
-  # `azurerm_private_dns_resolver*` resources plus `azurerm_management_lock` and
-  # `azurerm_role_assignment` -- used the same defaults, so one set covers the module:
-  # create 30m / read 5m / update 30m / delete 30m (azurerm v4.36.0).
   timeouts = {
     create = coalesce(try(var.timeouts.create, null), "30m")
     delete = coalesce(try(var.timeouts.delete, null), "30m")
@@ -22,11 +12,6 @@ locals {
 }
 
 locals {
-  # The role assignment request body, shared by the resolver and the forwarding rulesets.
-  # - The immutable ids are lowercased so a casing-only change does not replace the assignment.
-  # - AzureRM sent `principalType = "ServicePrincipal"` when `skip_service_principal_aad_check`
-  #   was true. ARM has no member of that name, so the body does the same unless
-  #   `principal_type` is set, in which case the explicit value wins.
   role_assignment_properties = {
     for key, assignment in module.interfaces.role_assignments_azapi : key => merge(
       assignment.body.properties,
@@ -45,8 +30,6 @@ locals {
 }
 
 locals {
-  # `avm-utl-interfaces` builds the lock body without `notes`. The AzureRM resources this
-  # module replaced always set `notes`, so it is merged back in to avoid a day-2 diff.
   lock_body = var.lock == null ? null : {
     properties = merge(module.interfaces.lock_azapi.body.properties, {
       notes = var.lock.kind == "CanNotDelete" ? "Cannot delete the resource or its child resources." : "Cannot delete or modify the resource or its child resources."
@@ -55,8 +38,6 @@ locals {
 }
 
 locals {
-  # Tag resolution for the child resources, lifted out of `main.tf` unchanged so the
-  # merge-with-module-tags behaviour is identical to the AzureRM implementation.
   forwarding_ruleset_tags = {
     for key, ruleset in tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset }) :
     key => ruleset.tags != null ? (ruleset.merge_with_module_tags ? merge(var.tags, ruleset.tags) : ruleset.tags) : (ruleset.merge_with_module_tags ? var.tags : {})
@@ -78,7 +59,6 @@ locals {
 
 locals {
   # Creating a list of forwarding rules for each forwarding ruleset.
-  # This list is itterated over in the azapi_resource.forwarding_rule resource
   forwarding_rules = flatten([
     for ruleset in local.forwarding_rulesets : [
       for rule_name, rule in ruleset.ruleset.rules : {
@@ -94,7 +74,6 @@ locals {
     ]
   ])
   # Creating a list of virtual network links for each forwarding ruleset.
-  # This list is itterated over in the azapi_resource.virtual_network_link_additional resource
   forwarding_rules_vnet_links = flatten([
     for ruleset_name, ruleset in local.forwarding_rulesets : [
       for key, vnet in ruleset.additional_virtual_network_links : {
@@ -108,7 +87,6 @@ locals {
     ]
   ])
   # Creating a list of forwarding rulesets for each outbound endpoint. skipping outbound endpoints without forwarding rulesets
-  # This list is itterated over in the azapi_resource.forwarding_ruleset resource
   forwarding_rulesets = flatten([
     for ob_ep_key, outbound_endpoint in var.outbound_endpoints : [
       for ruleset_key, ruleset in outbound_endpoint.forwarding_ruleset : {
@@ -125,7 +103,6 @@ locals {
     ] if outbound_endpoint.forwarding_ruleset != null
   ])
   # Creating a list of role assignments for each forwarding ruleset.
-  # This list is itterated over in the azapi_resource.role_assignments_rulesets resource
   ruleset_role_assignments = [
     for ruleset_index, ruleset in local.forwarding_rulesets : [
       for role_assignment_key, role_assignment in var.role_assignments : {
@@ -136,14 +113,6 @@ locals {
       }
     ]
   ]
-  # Key shape: do not "fix" this.
-  # `ruleset_role_assignments` is a list OF LISTS, so after `flatten()` the iteration
-  # variable `composite_key` is the numeric LIST INDEX as a string ("0", "1", ...), not the
-  # `composite_key` FIELD inside each object. Live state created by
-  # `azurerm_role_assignment.rulesets` is keyed exactly that way, and the `moved` block at the
-  # bottom of `main.tf` is a whole-resource move, so the keys must stay byte-for-byte
-  # identical. Keying this map on `assignment.composite_key` instead would silently plan a
-  # destroy + create of every ruleset role assignment.
   ruleset_role_assignments_map = {
     for composite_key, assignment in flatten(local.ruleset_role_assignments) :
     composite_key => assignment

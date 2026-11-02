@@ -3,19 +3,13 @@ variable "dns_forwarding_ruleset_id" {
   description = "The ID of the DNS forwarding ruleset to link to the virtual networks."
 
   validation {
-    # TFNFR38 (Severity-MUST): a LITERAL type through `parse_resource_id`, never a regex.
+
     condition = (
       can(provider::azapi::parse_resource_id("Microsoft.Network/dnsForwardingRulesets", var.dns_forwarding_ruleset_id)) &&
       try(provider::azapi::parse_resource_id("Microsoft.Network/dnsForwardingRulesets", var.dns_forwarding_ruleset_id).resource_group_name, "") != ""
     )
     error_message = "`dns_forwarding_ruleset_id` must be a valid `Microsoft.Network/dnsForwardingRulesets` resource ID, for example `/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.Network/dnsForwardingRulesets/ruleset`."
   }
-}
-
-variable "location" {
-  type        = string
-  description = "The Azure region for this module's resources or telemetry deployment."
-  nullable    = false
 }
 
 variable "virtual_networks" {
@@ -29,7 +23,7 @@ A map virtual network links to create.
 DESCRIPTION
 
   validation {
-    # TFNFR38 (Severity-MUST): a LITERAL type through `parse_resource_id`, never a regex.
+
     condition = alltrue([
       for vnet in var.virtual_networks :
       can(provider::azapi::parse_resource_id("Microsoft.Network/virtualNetworks", vnet.vnet_id)) &&
@@ -67,6 +61,17 @@ DESCRIPTION
   validation {
     condition     = alltrue([for path in var.ignore_body_changes.network_dns_forwarding_rulesets_virtual_network_links : length(trimspace(path)) > 0])
     error_message = "Every `ignore_body_changes.network_dns_forwarding_rulesets_virtual_network_links` entry must be a non-empty body path in dot notation, for example \"properties.metadata\"."
+  }
+}
+
+variable "location" {
+  type        = string
+  default     = null
+  description = "The Azure region for this module's resources or telemetry deployment."
+
+  validation {
+    condition     = !var.enable_telemetry || var.location != null
+    error_message = "The location must not be null when telemetry is enabled."
   }
 }
 

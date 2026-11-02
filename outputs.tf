@@ -5,7 +5,7 @@ output "forwarding_rulesets" {
       id                                         = ruleset.id
       name                                       = ruleset.name
       location                                   = ruleset.location
-      resource_group_name                        = var.resource_group_name
+      resource_group_name                        = provider::azapi::parse_resource_id("Microsoft.Resources/resourceGroups", var.parent_id).resource_group_name
       tags                                       = ruleset.tags
       private_dns_resolver_outbound_endpoint_ids = try([for endpoint in ruleset.output.properties.dnsResolverOutboundEndpoints : endpoint.id], null)
       provisioning_state                         = try(ruleset.output.properties.provisioningState, null)
@@ -19,14 +19,21 @@ output "inbound_endpoint_ips" {
 }
 
 output "inbound_endpoints" {
-  description = "Discrete inbound endpoint objects, keyed by endpoint key, with subnet_id, private_ip_address and private_ip_allocation_method at the object level instead of a nested ip_configurations block."
+  description = "Discrete inbound endpoint objects, keyed by endpoint key, with the original ip_configurations list and flattened subnet_id, private_ip_address and private_ip_allocation_method fields."
   value = {
     for key, endpoint in azapi_resource.inbound_endpoint : key => {
-      id                           = endpoint.id
-      name                         = endpoint.name
-      location                     = endpoint.location
-      private_dns_resolver_id      = endpoint.parent_id
-      tags                         = endpoint.tags
+      id                      = endpoint.id
+      name                    = endpoint.name
+      location                = endpoint.location
+      private_dns_resolver_id = endpoint.parent_id
+      tags                    = endpoint.tags
+      ip_configurations = try([
+        for ip_configuration in endpoint.output.properties.ipConfigurations : {
+          private_ip_address           = try(ip_configuration.privateIpAddress, null)
+          private_ip_allocation_method = try(ip_configuration.privateIpAllocationMethod, null)
+          subnet_id                    = try(ip_configuration.subnet.id, null)
+        }
+      ], [])
       subnet_id                    = try(endpoint.output.properties.ipConfigurations[0].subnet.id, null)
       private_ip_address           = try(endpoint.output.properties.ipConfigurations[0].privateIpAddress, null)
       private_ip_allocation_method = try(endpoint.output.properties.ipConfigurations[0].privateIpAllocationMethod, null)
@@ -61,7 +68,7 @@ output "resource" {
     id                  = azapi_resource.this.id
     name                = azapi_resource.this.name
     location            = azapi_resource.this.location
-    resource_group_name = var.resource_group_name
+    resource_group_name = provider::azapi::parse_resource_id("Microsoft.Resources/resourceGroups", var.parent_id).resource_group_name
     tags                = azapi_resource.this.tags
     virtual_network_id  = var.virtual_network_resource_id
     dns_resolver_state  = try(azapi_resource.this.output.properties.dnsResolverState, null)

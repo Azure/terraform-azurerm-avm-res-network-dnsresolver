@@ -27,6 +27,23 @@ override_resource {
 }
 
 override_resource {
+  target = azapi_resource.inbound_endpoint
+  values = {
+    output = {
+      properties = {
+        ipConfigurations = [{
+          privateIpAddress          = "10.0.0.4"
+          privateIpAllocationMethod = "Static"
+          subnet = {
+            id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test/subnets/inbound"
+          }
+        }]
+      }
+    }
+  }
+}
+
+override_resource {
   target = azapi_resource.forwarding_ruleset
   values = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset"
@@ -48,7 +65,7 @@ override_data {
 variables {
   location                    = "northeurope"
   name                        = "test"
-  resource_group_name         = "test"
+  parent_id                   = "/subscriptions/00000000-0000-0000-0000-000000000003/resourceGroups/explicit-scope"
   virtual_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test"
   enable_telemetry            = false
 }
@@ -56,9 +73,19 @@ variables {
 run "defaults" {
   command = apply
 
+  providers = {
+    azapi     = azapi
+    random    = random
+    terraform = terraform
+  }
+
   assert {
     condition     = output.name == "test" && output.resource_id == azapi_resource.this.id
     error_message = "The resolver name and resource ID must be returned."
+  }
+  assert {
+    condition     = azapi_resource.this.parent_id == var.parent_id && output.resource.resource_group_name == "explicit-scope"
+    error_message = "The resolver must use the caller's known parent ID and preserve its resource-group-name output."
   }
   assert {
     condition     = length(output.inbound_endpoints) == 0 && length(output.outbound_endpoints) == 0 && length(output.forwarding_rulesets) == 0
@@ -68,15 +95,16 @@ run "defaults" {
     condition     = length(azapi_resource.telemetry) == 0 && length(terraform_data.telemetry) == 0 && length(data.azapi_client_config.telemetry) == 0 && length(azapi_resource.lock) == 0 && length(azapi_resource.role_assignments) == 0
     error_message = "Disabled telemetry and unconfigured locks and assignments must not create resources."
   }
+}
+
+run "telemetry_enabled" {
+  command = apply
+
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
-}
-
-run "telemetry_enabled" {
-  command = apply
 
   variables {
     enable_telemetry = true
@@ -86,15 +114,16 @@ run "telemetry_enabled" {
     condition     = length(azapi_resource.telemetry) == 1 && length(data.azapi_client_config.telemetry) == 1 && length(terraform_data.telemetry) == 1
     error_message = "Enabled telemetry must use the mocked providers."
   }
+}
+
+run "endpoints_rules_and_links" {
+  command = apply
+
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
-}
-
-run "endpoints_rules_and_links" {
-  command = apply
 
   variables {
     tags = { environment = "test" }
@@ -136,6 +165,10 @@ run "endpoints_rules_and_links" {
     error_message = "The static inbound address and merged endpoint tags must be preserved."
   }
   assert {
+    condition     = output.inbound_endpoints["inbound"].ip_configurations[0].private_ip_address == "10.0.0.4" && output.inbound_endpoints["inbound"].ip_configurations[0].private_ip_allocation_method == "Static" && output.inbound_endpoints["inbound"].ip_configurations[0].subnet_id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test/subnets/inbound"
+    error_message = "Inbound endpoint outputs must retain the nested ip_configurations shape."
+  }
+  assert {
     condition     = azapi_resource.forwarding_rule["outbound-ruleset-example"].body.properties.domainName == "example.com." && azapi_resource.forwarding_rule["outbound-ruleset-example"].body.properties.forwardingRuleState == "Disabled"
     error_message = "Forwarding rules must retain their domain and enabled setting."
   }
@@ -143,15 +176,16 @@ run "endpoints_rules_and_links" {
     condition     = length(azapi_resource.virtual_network_link_default) == 1 && azapi_resource.virtual_network_link_additional["outbound-ruleset-spoke"].body.properties.metadata["purpose"] == "spoke"
     error_message = "Default and additional virtual network links must be created with their metadata."
   }
+}
+
+run "optional_rules" {
+  command = apply
+
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
-}
-
-run "optional_rules" {
-  command = apply
 
   variables {
     outbound_endpoints = {
@@ -168,15 +202,16 @@ run "optional_rules" {
     condition     = length(output.forwarding_rulesets) == 1 && length(azapi_resource.forwarding_rule) == 0
     error_message = "A forwarding ruleset must support omitting its optional rules."
   }
+}
+
+run "locks_and_role_assignments" {
+  command = apply
+
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
-}
-
-run "locks_and_role_assignments" {
-  command = apply
 
   variables {
     lock = { kind = "CanNotDelete" }
@@ -213,21 +248,32 @@ run "locks_and_role_assignments" {
     condition     = length(azapi_resource.role_assignments_rulesets) == 1 && endswith(azapi_resource.role_assignments_rulesets["0"].body.properties.roleDefinitionId, "acdd72a7-3385-48ef-bd42-f606fba81ae7") && azapi_resource.role_assignments_rulesets["0"].body.properties.principalType == "ServicePrincipal"
     error_message = "The existing ruleset assignment address and role must be preserved."
   }
+}
+
+run "invalid_lock" {
+  command = plan
+
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
-}
-
-run "invalid_lock" {
-  command = plan
 
   variables {
     lock = { kind = "Invalid" }
   }
 
   expect_failures = [var.lock]
+}
+
+run "invalid_parent_id" {
+  command = plan
+
+  variables {
+    parent_id = "not-a-resource-id"
+  }
+
+  expect_failures = [var.parent_id]
   providers = {
     azapi     = azapi
     random    = random
@@ -238,14 +284,15 @@ run "invalid_lock" {
 run "invalid_name" {
   command = plan
 
-  variables {
-    name = ""
-  }
-
-  expect_failures = [var.name]
   providers = {
     azapi     = azapi
     random    = random
     terraform = terraform
   }
+
+  variables {
+    name = ""
+  }
+
+  expect_failures = [var.name]
 }

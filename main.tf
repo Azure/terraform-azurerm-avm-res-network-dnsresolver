@@ -1,8 +1,3 @@
-# The standard AVM interfaces (resource lock, role assignments) rendered as AzAPI bodies.
-# `role_assignment_definition_scope` is the resource group that hosts the resolver, which is the
-# scope AzureRM resolved `role_definition_name` at. A role name therefore finds resource-group
-# custom roles as well as subscription and inherited ones. A name that is not found is passed
-# through as the role definition id, so a lookup at the wrong scope would send an invalid id.
 module "interfaces" {
   source  = "Azure/avm-utl-interfaces/azure"
   version = "0.9.0"
@@ -10,14 +5,14 @@ module "interfaces" {
   location                         = var.location
   enable_telemetry                 = var.enable_telemetry
   lock                             = var.lock
-  role_assignment_definition_scope = local.resource_group_resource_id
+  role_assignment_definition_scope = var.parent_id
   role_assignments                 = var.role_assignments
 }
 
 resource "azapi_resource" "this" {
   location  = local.location
   name      = var.name
-  parent_id = local.resource_group_resource_id
+  parent_id = var.parent_id
   type      = var.resource_types.network_dns_resolvers
   body = {
     properties = {
@@ -26,12 +21,8 @@ resource "azapi_resource" "this" {
       }
     }
   }
-  ignore_body_changes = length(var.ignore_body_changes.network_dns_resolvers) > 0 ? var.ignore_body_changes.network_dns_resolvers : null
-  # Matches AzureRM's nil-pointer/omitempty serialisation: an optional the consumer left unset
-  # is absent from the request rather than sent as an explicit JSON null.
+  ignore_body_changes  = length(var.ignore_body_changes.network_dns_resolvers) > 0 ? var.ignore_body_changes.network_dns_resolvers : null
   ignore_null_property = true
-  # `virtual_network_id` was ForceNew on `azurerm_private_dns_resolver`: a resolver
-  # cannot be repointed at a different virtual network in place.
   replace_triggers_refs = [
     "properties.virtualNetwork.id",
   ]
@@ -68,8 +59,6 @@ resource "azapi_resource" "inbound_endpoint" {
           subnet = {
             id = "${var.virtual_network_resource_id}/subnets/${each.value.subnet_name}"
           }
-          # Validation limits this to Static endpoints. A Dynamic IP is assigned by Azure and is
-          # never read back into the body, so a refresh after create cannot introduce a diff.
           privateIpAddress          = each.value.private_ip_address
           privateIpAllocationMethod = each.value.private_ip_allocation_method
         }
@@ -78,13 +67,11 @@ resource "azapi_resource" "inbound_endpoint" {
   }
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_resolvers_inbound_endpoints) > 0 ? var.ignore_body_changes.network_dns_resolvers_inbound_endpoints : null
   ignore_null_property = true
-  # Preserve AzureRM's IP-configuration replacement semantics without tracking assigned Dynamic IPs.
   replace_triggers_refs = [
     "properties.ipConfigurations[0].subnet.id",
     "properties.ipConfigurations[0].privateIpAllocationMethod",
     "properties.ipConfigurations[?privateIpAllocationMethod == 'Static'].privateIpAddress",
   ]
-  # Refresh these exports at adoption so downstream DNS consumers receive the assigned IP.
   response_export_values = [
     "properties.ipConfigurations",
     "properties.provisioningState",
@@ -120,7 +107,6 @@ resource "azapi_resource" "outbound_endpoint" {
   }
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_resolvers_outbound_endpoints) > 0 ? var.ignore_body_changes.network_dns_resolvers_outbound_endpoints : null
   ignore_null_property = true
-  # `subnet_id` was ForceNew on `azurerm_private_dns_resolver_outbound_endpoint`.
   replace_triggers_refs = [
     "properties.subnet.id",
   ]
@@ -144,13 +130,6 @@ resource "azapi_resource" "outbound_endpoint" {
 }
 
 # the "terraform_data" resource is used to trigger replacement of the forwarding rulesets when the outbound endpoint is recreated"
-#
-# Kept on purpose. Removing it would destroy live `terraform_data` state entries and would also
-# broaden the trigger: `replace_triggered_by` on a single resource instance fires when that
-# instance is planned for update as well as for replace, so pointing the rulesets straight at
-# the endpoint would recreate them on any endpoint change (a tag edit, for example). `input`
-# now holds the AzAPI id; AzAPI re-serialises the same parsed ARM id, so the stored value is
-# unchanged and no ruleset is triggered at adoption.
 resource "terraform_data" "outbound" {
   for_each = tomap({ for ruleset in local.forwarding_rulesets : "${ruleset.outbound_endpoint_name}-${ruleset.name}" => ruleset })
 
@@ -164,7 +143,7 @@ resource "azapi_resource" "forwarding_ruleset" {
 
   location  = local.location
   name      = each.value.name
-  parent_id = local.resource_group_resource_id
+  parent_id = var.parent_id
   type      = var.resource_types.network_dns_forwarding_rulesets
   body = {
     properties = {
@@ -177,10 +156,6 @@ resource "azapi_resource" "forwarding_ruleset" {
   }
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_forwarding_rulesets) > 0 ? var.ignore_body_changes.network_dns_forwarding_rulesets : null
   ignore_null_property = true
-  # No `replace_triggers_refs`: the only ForceNew field on
-  # `azurerm_private_dns_resolver_dns_forwarding_ruleset` was `name`, which AzAPI already
-  # treats as a replacement trigger natively. Outbound-endpoint replacement is propagated by
-  # `terraform_data.outbound` below, exactly as before.
   response_export_values = [
     "properties.dnsResolverOutboundEndpoints",
     "properties.provisioningState",
@@ -212,13 +187,9 @@ resource "azapi_resource" "forwarding_rule" {
   type      = var.resource_types.network_dns_forwarding_rulesets_forwarding_rules
   body = {
     properties = {
-      domainName = each.value.domain_name
-      # AzureRM mapped the `enabled` bool onto this enum.
+      domainName          = each.value.domain_name
       forwardingRuleState = each.value.enabled ? "Enabled" : "Disabled"
       metadata            = each.value.metadata
-      # `destination_ip_addresses` is a map(string) keyed by IP with the port as the value, but
-      # ARM types `port` as an Integer, so the port is converted here. AzureRM got the same
-      # conversion for free from its TypeInt schema.
       targetDnsServers = [
         for ip_address, port in each.value.destination_ip_addresses : {
           ipAddress = ip_address
@@ -229,7 +200,6 @@ resource "azapi_resource" "forwarding_rule" {
   }
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_forwarding_rulesets_forwarding_rules) > 0 ? var.ignore_body_changes.network_dns_forwarding_rulesets_forwarding_rules : null
   ignore_null_property = true
-  # `domain_name` was ForceNew on `azurerm_private_dns_resolver_forwarding_rule`.
   replace_triggers_refs = [
     "properties.domainName",
   ]
@@ -263,7 +233,6 @@ resource "azapi_resource" "virtual_network_link_default" {
   }
   ignore_body_changes  = length(var.ignore_body_changes.network_dns_forwarding_rulesets_virtual_network_links) > 0 ? var.ignore_body_changes.network_dns_forwarding_rulesets_virtual_network_links : null
   ignore_null_property = true
-  # `virtual_network_id` was ForceNew on `azurerm_private_dns_resolver_virtual_network_link`.
   replace_triggers_refs = [
     "properties.virtualNetwork.id",
   ]
@@ -366,8 +335,6 @@ resource "azapi_resource" "lock_rulesets" {
 resource "azapi_resource" "role_assignments" {
   for_each = module.interfaces.role_assignments_azapi
 
-  # A pinned name wins. Otherwise derive one from the resolver, principal, role and delegated
-  # identity, so a replacement caused by a changed principal or role gets a new GUID.
   name = coalesce(
     var.role_assignments[each.key].name,
     uuidv5("url", join("|", [
@@ -382,12 +349,8 @@ resource "azapi_resource" "role_assignments" {
   body = {
     properties = local.role_assignment_properties[each.key]
   }
-  # Keeps the configured casing after refresh, so Azure's casing cannot trigger a replacement.
   ignore_casing        = true
   ignore_null_property = true
-  # ARM rejects an in-place change of these members (`RoleAssignmentUpdateNotPermitted`), so a
-  # change replaces the assignment. A replacement takes the configured name, which is a new
-  # derived GUID unless the consumer pinned `name`.
   replace_triggers_refs = [
     "properties.principalId",
     "properties.roleDefinitionId",
@@ -407,12 +370,6 @@ resource "azapi_resource" "role_assignments" {
     }
   }
 
-  # Required by the migration (`avm-tf-migration` SKILL).
-  # A role assignment created by AzureRM has a server-assigned GUID as its name. The state move
-  # recovers it from the resource id, while the derived name above can never match it, and
-  # `name` carries `RequiresReplace` in AzAPI -- so without this the adoption plan would
-  # DESTROY AND RECREATE every existing role assignment. `ignore_changes` is inert at create
-  # and replace time, so a new or replaced role assignment takes the configured name.
   lifecycle {
     ignore_changes = [name]
   }
@@ -421,9 +378,6 @@ resource "azapi_resource" "role_assignments" {
 resource "azapi_resource" "role_assignments_rulesets" {
   for_each = local.ruleset_role_assignments_map
 
-  # One derived name per ruleset copy. It includes the ruleset id, so it never collides with the
-  # resolver's assignment or with another ruleset's. `var.role_assignments[*].name` applies to
-  # the resolver only.
   name = uuidv5("url", join("|", [
     lower(each.value.ruleset_id),
     local.role_assignment_properties[each.value.role_assignment_key].principalId,
@@ -432,13 +386,9 @@ resource "azapi_resource" "role_assignments_rulesets" {
   ]))
   parent_id = each.value.ruleset_id
   type      = module.interfaces.role_assignments_azapi[each.value.role_assignment_key].type
-  # AzureRM passed `role_definition_id_or_name` to `role_definition_name` unconditionally here,
-  # which failed whenever a consumer supplied a role definition ID. The interfaces module looks
-  # the name up and passes an ID straight through, so both forms now work.
   body = {
     properties = local.role_assignment_properties[each.value.role_assignment_key]
   }
-  # See `azapi_resource.role_assignments`.
   ignore_casing        = true
   ignore_null_property = true
   replace_triggers_refs = [
@@ -460,22 +410,10 @@ resource "azapi_resource" "role_assignments_rulesets" {
     }
   }
 
-  # See `azapi_resource.role_assignments`.
   lifecycle {
     ignore_changes = [name]
   }
 }
-
-# =============================================================================
-# AzureRM -> AzAPI state moves (`avm-tf-migration` SKILL)
-#
-# The provider migration is in place: same module, same `for_each`/`count`
-# boundary, same keys, so every move is a whole-resource move and the consumer
-# only bumps the module version. Plan with a normal refresh: the `move_state`
-# private flag makes the first refreshing read backfill `body` from Azure. A
-# `-refresh=false` plan hits azapi#1227 and plans a replace on every resource
-# that carries `location`.
-# =============================================================================
 
 moved {
   from = azurerm_private_dns_resolver.this

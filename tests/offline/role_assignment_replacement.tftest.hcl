@@ -9,13 +9,7 @@ mock_provider "azapi" {
 }
 mock_provider "random" {}
 
-# Offline role-assignment replacement checks. The plan runs use the real AzAPI provider so that
-# `replace_triggers_refs` is evaluated by the provider itself. Refresh is disabled, the endpoints
-# are pinned to unreachable loopback addresses and no Azure authentication is used. State comes
-# from the mocked apply runs, whose forwarding ruleset assignment name is the derived
-# `bb083112-...` (the module derives the ruleset name, so it cannot be pinned) and whose
-# resolver assignment name is the pinned `1111...` that stands in for an adopted AzureRM GUID.
-# Run with: terraform test -test-directory=tests/offline
+
 provider "azapi" {
   alias                      = "offline"
   subscription_id            = "00000000-0000-0000-0000-000000000000"
@@ -74,7 +68,7 @@ variables {
   enable_telemetry            = false
   name                        = "resolver-review"
   location                    = "eastus"
-  resource_group_name         = "rg-test"
+  parent_id                   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test"
   virtual_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.Network/virtualNetworks/vnet-test"
   outbound_endpoints = {
     out = {

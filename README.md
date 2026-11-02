@@ -24,6 +24,8 @@ This module now creates every Azure resource with the [`azapi`](https://registry
 
 **What you must do when upgrading.** Remove the `azurerm` provider from the `required_providers` of any configuration that only declared it for this module, and add `Azure/azapi`. The module carries in-module `moved` blocks for every resource it owns, so the existing state is migrated automatically: run `terraform init -upgrade` and then `terraform plan`, and review the plan before applying.
 
+**Breaking input change.** The module now requires `parent_id`, the fully-qualified ARM ID of the existing resource group. Replace `resource_group_name` with the resource group's ID (for example, `azapi_resource.resource_group.id`) in every module call.
+
 > [!IMPORTANT]
 > Run the upgrade plan **with refresh enabled** (the default). The state move records only the resource identity; the provider reads the rest of each resource body back from Azure during the refresh. Planning the upgrade with `-refresh=false` can produce spurious replacements.
 
@@ -87,7 +89,6 @@ The following resources are used by this module:
 - [azapi_resource.virtual_network_link_default](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [terraform_data.outbound](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
 - [terraform_data.telemetry](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
-- [azapi_client_config.current](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 - [azapi_client_config.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 
 <!-- markdownlint-disable MD013 -->
@@ -107,9 +108,9 @@ Description: The name of the dns resolver.
 
 Type: `string`
 
-### <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name)
+### <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id)
 
-Description: The resource group where the resources will be deployed.
+Description: The fully-qualified ARM resource ID of the existing resource group into which the DNS resolver and forwarding rulesets will be deployed.
 
 Type: `string`
 
@@ -418,7 +419,7 @@ Description: The IP addresses of the inbound endpoints.
 
 ### <a name="output_inbound_endpoints"></a> [inbound\_endpoints](#output\_inbound\_endpoints)
 
-Description: Discrete inbound endpoint objects, keyed by endpoint key, with subnet\_id, private\_ip\_address and private\_ip\_allocation\_method at the object level instead of a nested ip\_configurations block.
+Description: Discrete inbound endpoint objects, keyed by endpoint key, with the original ip\_configurations list and flattened subnet\_id, private\_ip\_address and private\_ip\_allocation\_method fields.
 
 ### <a name="output_name"></a> [name](#output\_name)
 

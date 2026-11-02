@@ -28,11 +28,6 @@ resource "azapi_resource" "rg" {
   response_export_values = []
 }
 
-# Subnets are declared inline in the virtual network body rather than as separate child
-# resources. One PUT avoids the `AnotherOperationInProgress` conflicts that concurrent subnet
-# writes cause, and AzAPI only tracks the body properties that are declared here, so the
-# delegation the DNS resolver service adds to the outbound subnets never shows up as drift.
-# That replaces the `lifecycle { ignore_changes = [delegation] }` the AzureRM example needed.
 resource "azapi_resource" "vnet1" {
   location  = local.location
   name      = "vnet-test-resolver"
@@ -88,7 +83,7 @@ module "private_resolver" {
 
   location                    = local.location
   name                        = "resolver"
-  resource_group_name         = azapi_resource.rg.name
+  parent_id                   = azapi_resource.rg.id
   virtual_network_resource_id = azapi_resource.vnet1.id
   enable_telemetry            = var.enable_telemetry
   inbound_endpoints = {
@@ -150,7 +145,6 @@ module "ruleset_vnet_link" {
   source = "../../modules/ruleset_vnet_link"
 
   dns_forwarding_ruleset_id = module.private_resolver.forwarding_rulesets["outbound1-ruleset1"].id
-  location                  = local.location
   virtual_networks = {
     vnet2 = {
       vnet_id = azapi_resource.vnet2.id
@@ -161,6 +155,7 @@ module "ruleset_vnet_link" {
     }
   }
   enable_telemetry = var.enable_telemetry
+  location         = local.location
 }
 ```
 
