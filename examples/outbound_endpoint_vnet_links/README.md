@@ -133,7 +133,6 @@ module "ruleset_vnet_link" {
   source = "../../modules/ruleset_vnet_link"
 
   dns_forwarding_ruleset_id = module.private_resolver.forwarding_rulesets["outbound1-ruleset1"].id
-  location                  = local.location
   virtual_networks = {
     vnet2 = {
       vnet_id = azurerm_virtual_network.vnet2.id
@@ -144,6 +143,7 @@ module "ruleset_vnet_link" {
     }
   }
   enable_telemetry = var.enable_telemetry
+  location         = local.location
 }
 ```
 
