@@ -147,6 +147,8 @@ Paths are in dot notation relative to the request body, for example `["propertie
 - `network_dns_resolvers` - (Optional) Ignored body paths for the DNS resolver. Default `[]`.
 - `network_dns_resolvers_inbound_endpoints` - (Optional) Ignored body paths for the inbound endpoints. Default `[]`.
 - `network_dns_resolvers_outbound_endpoints` - (Optional) Ignored body paths for the outbound endpoints. Default `[]`.
+- `authorization_locks` - (Optional) Ignored body paths for resolver and forwarding-ruleset locks. Default `[]`.
+- `authorization_role_assignments` - (Optional) Ignored body paths for resolver and forwarding-ruleset role assignments. Default `[]`.
 
 While a path is ignored, configuration changes at that path are no longer sent to Azure. The value is write-only provider state, so a change only takes effect after an `apply`, and supplying a non-empty list requires Terraform 1.11 or later. Empty lists are collapsed to `null` before they reach the provider.
 
@@ -154,6 +156,8 @@ Type:
 
 ```hcl
 object({
+    authorization_locks                                   = optional(list(string), [])
+    authorization_role_assignments                        = optional(list(string), [])
     network_dns_forwarding_rulesets                       = optional(list(string), [])
     network_dns_forwarding_rulesets_forwarding_rules      = optional(list(string), [])
     network_dns_forwarding_rulesets_virtual_network_links = optional(list(string), [])
@@ -285,13 +289,17 @@ Description: (Optional) The Azure resource type and API version used for each re
 - `network_dns_resolvers` - (Optional) The type and API version of the DNS resolver. Default `Microsoft.Network/dnsResolvers@2025-05-01`.
 - `network_dns_resolvers_inbound_endpoints` - (Optional) The type and API version of the inbound endpoints. Default `Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01`.
 - `network_dns_resolvers_outbound_endpoints` - (Optional) The type and API version of the outbound endpoints. Default `Microsoft.Network/dnsResolvers/outboundEndpoints@2025-05-01`.
+- `authorization_locks` - (Optional) The type and API version for resolver and forwarding-ruleset locks. Default `Microsoft.Authorization/locks@2020-05-01`.
+- `authorization_role_assignments` - (Optional) The type and API version for resolver and forwarding-ruleset role assignments. Default `Microsoft.Authorization/roleAssignments@2022-04-01`.
 
-The lock and role assignment types are owned by the `Azure/avm-utl-interfaces/azure` module and are not configurable here.
+The lock and role assignment request bodies and names are supplied by the `Azure/avm-utl-interfaces/azure` module. Their AzAPI resource types use the configurable fields above.
 
 Type:
 
 ```hcl
 object({
+    authorization_locks                                   = optional(string, "Microsoft.Authorization/locks@2020-05-01")
+    authorization_role_assignments                        = optional(string, "Microsoft.Authorization/roleAssignments@2022-04-01")
     network_dns_forwarding_rulesets                       = optional(string, "Microsoft.Network/dnsForwardingRulesets@2025-05-01")
     network_dns_forwarding_rulesets_forwarding_rules      = optional(string, "Microsoft.Network/dnsForwardingRulesets/forwardingRules@2025-05-01")
     network_dns_forwarding_rulesets_virtual_network_links = optional(string, "Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01")

@@ -291,8 +291,9 @@ resource "azapi_resource" "lock" {
 
   name                   = coalesce(module.interfaces.lock_azapi.name, "lock-${var.lock.kind}")
   parent_id              = azapi_resource.this.id
-  type                   = module.interfaces.lock_azapi.type
+  type                   = var.resource_types.authorization_locks
   body                   = local.lock_body
+  ignore_body_changes    = length(var.ignore_body_changes.authorization_locks) > 0 ? var.ignore_body_changes.authorization_locks : null
   ignore_null_property   = true
   response_export_values = []
   retry                  = var.retry
@@ -314,8 +315,9 @@ resource "azapi_resource" "lock_rulesets" {
 
   name                   = coalesce(module.interfaces.lock_azapi.name, "lock-${each.key}")
   parent_id              = each.value.id
-  type                   = module.interfaces.lock_azapi.type
+  type                   = var.resource_types.authorization_locks
   body                   = local.lock_body
+  ignore_body_changes    = length(var.ignore_body_changes.authorization_locks) > 0 ? var.ignore_body_changes.authorization_locks : null
   ignore_null_property   = true
   response_export_values = []
   retry                  = var.retry
@@ -345,10 +347,11 @@ resource "azapi_resource" "role_assignments" {
     ]))
   )
   parent_id = azapi_resource.this.id
-  type      = each.value.type
+  type      = var.resource_types.authorization_role_assignments
   body = {
     properties = local.role_assignment_properties[each.key]
   }
+  ignore_body_changes  = length(var.ignore_body_changes.authorization_role_assignments) > 0 ? var.ignore_body_changes.authorization_role_assignments : null
   ignore_casing        = true
   ignore_null_property = true
   replace_triggers_refs = [
@@ -385,10 +388,11 @@ resource "azapi_resource" "role_assignments_rulesets" {
     lower(coalesce(local.role_assignment_properties[each.value.role_assignment_key].delegatedManagedIdentityResourceId, "-")),
   ]))
   parent_id = each.value.ruleset_id
-  type      = module.interfaces.role_assignments_azapi[each.value.role_assignment_key].type
+  type      = var.resource_types.authorization_role_assignments
   body = {
     properties = local.role_assignment_properties[each.value.role_assignment_key]
   }
+  ignore_body_changes  = length(var.ignore_body_changes.authorization_role_assignments) > 0 ? var.ignore_body_changes.authorization_role_assignments : null
   ignore_casing        = true
   ignore_null_property = true
   replace_triggers_refs = [

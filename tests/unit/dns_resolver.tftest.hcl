@@ -214,7 +214,15 @@ run "locks_and_role_assignments" {
   }
 
   variables {
+    ignore_body_changes = {
+      authorization_locks            = ["properties.notes"]
+      authorization_role_assignments = ["properties.description"]
+    }
     lock = { kind = "CanNotDelete" }
+    resource_types = {
+      authorization_locks            = "Microsoft.Authorization/locks@2016-09-01"
+      authorization_role_assignments = "Microsoft.Authorization/roleAssignments@2020-04-01-preview"
+    }
     role_assignments = {
       reader = {
         role_definition_id_or_name = "Reader"
@@ -239,6 +247,14 @@ run "locks_and_role_assignments" {
   assert {
     condition     = azapi_resource.lock[0].parent_id == output.resource_id && length(azapi_resource.lock_rulesets) == 1
     error_message = "Locks must protect the resolver and its forwarding rulesets."
+  }
+  assert {
+    condition     = azapi_resource.lock[0].type == "Microsoft.Authorization/locks@2016-09-01" && azapi_resource.lock_rulesets["outbound-ruleset"].type == "Microsoft.Authorization/locks@2016-09-01"
+    error_message = "Resolver and ruleset locks must use the configured lock API version."
+  }
+  assert {
+    condition     = azapi_resource.role_assignments["reader"].type == "Microsoft.Authorization/roleAssignments@2020-04-01-preview" && azapi_resource.role_assignments_rulesets["0"].type == "Microsoft.Authorization/roleAssignments@2020-04-01-preview"
+    error_message = "Resolver and ruleset role assignments must use the configured role-assignment API version."
   }
   assert {
     condition     = azapi_resource.role_assignments["reader"].body.properties.description == "DNS reader" && azapi_resource.role_assignments["reader"].body.properties.principalType == "ServicePrincipal"
