@@ -46,12 +46,6 @@ Description: The ID of the DNS forwarding ruleset to link to the virtual network
 
 Type: `string`
 
-### <a name="input_location"></a> [location](#input\_location)
-
-Description: The Azure region for this module's resources or telemetry deployment.
-
-Type: `string`
-
 ### <a name="input_virtual_networks"></a> [virtual\_networks](#input\_virtual\_networks)
 
 Description: A map virtual network links to create.
@@ -79,6 +73,14 @@ If it is set to false, then no telemetry will be collected.
 Type: `bool`
 
 Default: `true`
+
+### <a name="input_location"></a> [location](#input\_location)
+
+Description: The Azure region for this module's resources or telemetry deployment.
+
+Type: `string`
+
+Default: `null`
 
 ## Outputs
 
