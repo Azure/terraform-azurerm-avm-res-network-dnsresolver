@@ -9,59 +9,73 @@ This example shows how to create an outbound endpoint with VNet links.
 
 
 locals {
-  location = "northeurope"
+  inbound_subnet_name   = "subnet-test-resolver-inbound"
+  location              = "northeurope"
+  outbound2_subnet_name = "subnet-test-resolver-outbound2"
+  outbound_subnet_name  = "subnet-test-resolver-outbound"
 }
 
-resource "azurerm_resource_group" "rg" {
-  location = local.location
-  name     = "rg-resolver-vnet-link"
-}
+data "azapi_client_config" "current" {}
 
-resource "azurerm_virtual_network" "vnet1" {
-  location            = local.location
-  name                = "vnet-test-resolver"
-  resource_group_name = azurerm_resource_group.rg.name
-  address_space       = ["10.0.0.0/16"]
-}
-
-resource "azurerm_subnet" "name" {
-  name                 = "subnet-test-resolver-inbound"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet1.name
-  address_prefixes     = ["10.0.0.0/24"]
-
-  lifecycle {
-    ignore_changes = [delegation]
+resource "azapi_resource" "rg" {
+  location  = local.location
+  name      = "rg-resolver-vnet-link"
+  parent_id = "/subscriptions/${data.azapi_client_config.current.subscription_id}"
+  type      = "Microsoft.Resources/resourceGroups@2025-04-01"
+  body = {
+    properties = {}
   }
+  response_export_values = []
 }
 
-resource "azurerm_subnet" "out" {
-  name                 = "subnet-test-resolver-outbound"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet1.name
-  address_prefixes     = ["10.0.1.0/24"]
-
-  lifecycle {
-    ignore_changes = [delegation]
+resource "azapi_resource" "vnet1" {
+  location  = local.location
+  name      = "vnet-test-resolver"
+  parent_id = azapi_resource.rg.id
+  type      = "Microsoft.Network/virtualNetworks@2024-05-01"
+  body = {
+    properties = {
+      addressSpace = {
+        addressPrefixes = ["10.0.0.0/16"]
+      }
+      subnets = [
+        {
+          name = local.inbound_subnet_name
+          properties = {
+            addressPrefix = "10.0.0.0/24"
+          }
+        },
+        {
+          name = local.outbound_subnet_name
+          properties = {
+            addressPrefix = "10.0.1.0/24"
+          }
+        },
+        {
+          name = local.outbound2_subnet_name
+          properties = {
+            addressPrefix = "10.0.2.0/24"
+          }
+        }
+      ]
+    }
   }
+  response_export_values = []
 }
 
-resource "azurerm_subnet" "out2" {
-  name                 = "subnet-test-resolver-outbound2"
-  resource_group_name  = azurerm_resource_group.rg.name
-  virtual_network_name = azurerm_virtual_network.vnet1.name
-  address_prefixes     = ["10.0.2.0/24"]
-
-  lifecycle {
-    ignore_changes = [delegation]
+resource "azapi_resource" "vnet2" {
+  location  = local.location
+  name      = "vnet-test-resolver2"
+  parent_id = azapi_resource.rg.id
+  type      = "Microsoft.Network/virtualNetworks@2024-05-01"
+  body = {
+    properties = {
+      addressSpace = {
+        addressPrefixes = ["10.90.0.0/16"]
+      }
+    }
   }
-}
-
-resource "azurerm_virtual_network" "vnet2" {
-  location            = local.location
-  name                = "vnet-test-resolver2"
-  resource_group_name = azurerm_resource_group.rg.name
-  address_space       = ["10.90.0.0/16"]
+  response_export_values = []
 }
 
 module "private_resolver" {
@@ -69,13 +83,13 @@ module "private_resolver" {
 
   location                    = local.location
   name                        = "resolver"
-  resource_group_name         = azurerm_resource_group.rg.name
-  virtual_network_resource_id = azurerm_virtual_network.vnet1.id
+  parent_id                   = azapi_resource.rg.id
+  virtual_network_resource_id = azapi_resource.vnet1.id
   enable_telemetry            = var.enable_telemetry
   inbound_endpoints = {
     "inbound1" = {
       name        = "inbound1"
-      subnet_name = azurerm_subnet.name.name
+      subnet_name = local.inbound_subnet_name
       tags = {
         "source" = "onprem"
       }
@@ -89,7 +103,7 @@ module "private_resolver" {
         "destination" = "onprem"
       }
       merge_with_module_tags = false
-      subnet_name            = azurerm_subnet.out.name
+      subnet_name            = local.outbound_subnet_name
       forwarding_ruleset = {
         "ruleset1" = {
           name = "ruleset1"
@@ -101,7 +115,6 @@ module "private_resolver" {
             "rule1" = {
               name        = "rule1"
               domain_name = "example.com."
-              state       = "Enabled"
               destination_ip_addresses = {
                 "10.1.1.1" = "53"
                 "10.1.1.2" = "53"
@@ -110,7 +123,6 @@ module "private_resolver" {
             "rule2" = {
               name        = "rule2"
               domain_name = "example2.com."
-              state       = "Enabled"
               destination_ip_addresses = {
                 "10.2.2.2" = "53"
               }
@@ -121,7 +133,7 @@ module "private_resolver" {
     }
     "outbound2" = {
       name        = "outbound2"
-      subnet_name = azurerm_subnet.out2.name
+      subnet_name = local.outbound2_subnet_name
     }
   }
   tags = {
@@ -135,7 +147,7 @@ module "ruleset_vnet_link" {
   dns_forwarding_ruleset_id = module.private_resolver.forwarding_rulesets["outbound1-ruleset1"].id
   virtual_networks = {
     vnet2 = {
-      vnet_id = azurerm_virtual_network.vnet2.id
+      vnet_id = azapi_resource.vnet2.id
       metadata = {
         type = "spoke"
         env  = "dev"
@@ -154,18 +166,16 @@ The following requirements are needed by this module:
 
 - <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) (>= 1.9, < 2.0)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 4.36)
+- <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
 ## Resources
 
 The following resources are used by this module:
 
-- [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) (resource)
-- [azurerm_subnet.name](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_subnet.out](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_subnet.out2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) (resource)
-- [azurerm_virtual_network.vnet1](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
-- [azurerm_virtual_network.vnet2](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/virtual_network) (resource)
+- [azapi_resource.rg](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.vnet1](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.vnet2](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_client_config.current](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
 
 <!-- markdownlint-disable MD013 -->
 ## Required Inputs

@@ -8,6 +8,12 @@
 **/tests/*
 !**/tests/unit/
 !**/tests/unit/*.tftest.hcl
+tests/unit/*
+!tests/unit/*.tftest.hcl
+!tests/unit/Test-InboundEndpointPlans.ps1
+!tests/offline/
+tests/offline/*
+!tests/offline/*.tftest.hcl
 
 # Crash log files
 crash.log

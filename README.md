@@ -18,6 +18,47 @@ This is a module for deploying private dns resolver. It can be used to deploy th
 - For information on the Azure Private DNS Resolver service, see [Private DNS Resolver](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview).
 - For information on how to configure subnets for the resolver, see [Inbound Endpoints](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview#inbound-endpoints) and [Outbound Endpoints](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview#outbound-endpoints).
 
+## Provider Migration (AzureRM to AzAPI)
+
+This module now creates every Azure resource with the [`azapi`](https://registry.terraform.io/providers/Azure/azapi/latest) provider. The `azurerm` provider is no longer required and is no longer declared.
+
+**What you must do when upgrading.** Remove the `azurerm` provider from the `required_providers` of any configuration that only declared it for this module, and add `Azure/azapi`. The module carries in-module `moved` blocks for every resource it owns, so the existing state is migrated automatically: run `terraform init -upgrade` and then `terraform plan`, and review the plan before applying.
+
+**Breaking input change.** The module now requires `parent_id`, the fully-qualified ARM ID of the existing resource group. Replace `resource_group_name` with the resource group's ID (for example, `azapi_resource.resource_group.id`) in every module call.
+
+> [!IMPORTANT]
+> Run the upgrade plan **with refresh enabled** (the default). The state move records only the resource identity; the provider reads the rest of each resource body back from Azure during the refresh. Planning the upgrade with `-refresh=false` can produce spurious replacements.
+
+**Expected upgrade plan.** The upgrade is designed to produce no unintended destroys or replacements. Review in-place updates before applying; they reconcile the API version recorded by the state move and populate exported response values.
+
+Dynamic inbound endpoints never send `privateIpAddress`, and the module does not read the
+assigned IP back into the request body, so a new Dynamic endpoint converges after its first
+refresh. Only Static endpoints send their configured IP. After the upgrade, an adopted
+Dynamic endpoint may plan a one-time in-place update that drops the read-back IP from the
+request body; it is not a replacement.
+
+Changing an inbound endpoint's subnet, allocation method or Static IP address replaces that
+endpoint, preserving the previous AzureRM lifecycle. The assigned IP of an unchanged Dynamic
+endpoint is not a replacement trigger. Replacement can interrupt DNS resolution; review the
+plan and update downstream DNS configuration if the assigned address changes.
+
+**Breaking changes.**
+
+- **Output shapes.** All top-level output names are unchanged. `inbound_endpoints`, `outbound_endpoints`, `forwarding_rulesets` and `resource` now return discrete objects assembled from AzAPI attributes and exported response fields rather than complete AzureRM resource objects. Their nested shapes are not backward-compatible. For example, use `inbound_endpoints[key].private_ip_address`, `.private_ip_allocation_method` and `.subnet_id` instead of `inbound_endpoints[key].ip_configurations[0]` fields. Provider-only fields such as `timeouts` are no longer exposed. `inbound_endpoint_ips`, `name` and `resource_id` retain their previous value shapes.
+- **`role_assignments[*].skip_service_principal_aad_check`** has no ARM request member. When it is `true` and `principal_type` is unset, the module sends `principalType = "ServicePrincipal"`, as AzureRM did. An explicit `principal_type` wins. A principal that has not finished replicating is retried by `var.retry`, whose default list includes `PrincipalNotFound`.
+- **Role assignment replacement.** ARM rejects an in-place change to the principal, the role definition or the delegated identity of a role assignment. Changing `principal_id`, `role_definition_id_or_name` (after it resolves to a role definition ID) or `delegated_managed_identity_resource_id` under an existing key replaces the assignment, and the replacement gets a new derived GUID. Terraform deletes the old assignment before it creates the new one, so access is briefly missing. An assignment adopted from AzureRM keeps its existing GUID on an unchanged upgrade. A `name` that you set is reused by a replacement. Role names are now resolved at the resource group of the DNS resolver, as AzureRM did, so resource-group custom roles resolve.
+- **Tags** are now an AzAPI `Optional`/`Computed` attribute. Leaving `var.tags` unset no longer guarantees that tags placed on the resources out of band are removed. Manage tags explicitly if you rely on this module to own them.
+
+**New inputs.** `resource_types`, `ignore_body_changes`, `retry`, `timeouts` and `role_assignments[*].name` are new optional inputs that expose the AzAPI API version, per-resource ignored body paths, retry behaviour, operation timeouts, and a pinned role assignment GUID. All defaults preserve the previous behaviour.
+
+## Local regression checks
+
+Run `avm test unit` for provider-mocked inbound IP request-body tests. Run
+`pwsh -File tests\unit\Test-InboundEndpointPlans.ps1` for offline lifecycle plans with
+the real AzAPI provider. The latter uses synthetic AzAPI state, including a fresh Dynamic
+create followed by a refresh that returns the assigned IP. Neither suite proves AzureRM-to-AzAPI state conversion or
+live Azure behavior; those require a separately authorized upgrade-path test.
+
 ## Feedback
 - Your feedback is welcome! Please raise an issue or feature request on the module's GitHub repository.
 
@@ -30,24 +71,22 @@ The following requirements are needed by this module:
 
 - <a name="requirement_azapi"></a> [azapi](#requirement\_azapi) (~> 2.12)
 
-- <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) (~> 4.36)
-
 ## Resources
 
 The following resources are used by this module:
 
+- [azapi_resource.forwarding_rule](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.forwarding_ruleset](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.inbound_endpoint](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.lock](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.lock_rulesets](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.outbound_endpoint](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.role_assignments](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.role_assignments_rulesets](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [azapi_resource.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
-- [azurerm_management_lock.rulesets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_management_lock.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/management_lock) (resource)
-- [azurerm_private_dns_resolver.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver) (resource)
-- [azurerm_private_dns_resolver_dns_forwarding_ruleset.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_dns_forwarding_ruleset) (resource)
-- [azurerm_private_dns_resolver_forwarding_rule.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_forwarding_rule) (resource)
-- [azurerm_private_dns_resolver_inbound_endpoint.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_inbound_endpoint) (resource)
-- [azurerm_private_dns_resolver_outbound_endpoint.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_outbound_endpoint) (resource)
-- [azurerm_private_dns_resolver_virtual_network_link.additional](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_virtual_network_link) (resource)
-- [azurerm_private_dns_resolver_virtual_network_link.default](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_resolver_virtual_network_link) (resource)
-- [azurerm_role_assignment.dnsresolver](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
-- [azurerm_role_assignment.rulesets](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) (resource)
+- [azapi_resource.this](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.virtual_network_link_additional](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
+- [azapi_resource.virtual_network_link_default](https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/resource) (resource)
 - [terraform_data.outbound](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
 - [terraform_data.telemetry](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) (resource)
 - [azapi_client_config.telemetry](https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/client_config) (data source)
@@ -69,9 +108,9 @@ Description: The name of the dns resolver.
 
 Type: `string`
 
-### <a name="input_resource_group_name"></a> [resource\_group\_name](#input\_resource\_group\_name)
+### <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id)
 
-Description: The resource group where the resources will be deployed.
+Description: The fully-qualified ARM resource ID of the existing resource group into which the DNS resolver and forwarding rulesets will be deployed.
 
 Type: `string`
 
@@ -95,6 +134,40 @@ If it is set to false, then no telemetry will be collected.
 Type: `bool`
 
 Default: `true`
+
+### <a name="input_ignore_body_changes"></a> [ignore\_body\_changes](#input\_ignore\_body\_changes)
+
+Description: (Optional) Body property paths whose changes the `azapi` provider ignores after creation, letting an out-of-band controller own those properties without producing perpetual `terraform plan` drift.
+
+Paths are in dot notation relative to the request body, for example `["properties.dnsResolverOutboundEndpoints"]`.
+
+- `network_dns_forwarding_rulesets` - (Optional) Ignored body paths for the DNS forwarding rulesets. Default `[]`.
+- `network_dns_forwarding_rulesets_forwarding_rules` - (Optional) Ignored body paths for the forwarding rules. Default `[]`.
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) Ignored body paths for both the default and the additional virtual network links. Default `[]`.
+- `network_dns_resolvers` - (Optional) Ignored body paths for the DNS resolver. Default `[]`.
+- `network_dns_resolvers_inbound_endpoints` - (Optional) Ignored body paths for the inbound endpoints. Default `[]`.
+- `network_dns_resolvers_outbound_endpoints` - (Optional) Ignored body paths for the outbound endpoints. Default `[]`.
+- `authorization_locks` - (Optional) Ignored body paths for resolver and forwarding-ruleset locks. Default `[]`.
+- `authorization_role_assignments` - (Optional) Ignored body paths for resolver and forwarding-ruleset role assignments. Default `[]`.
+
+While a path is ignored, configuration changes at that path are no longer sent to Azure. The value is write-only provider state, so a change only takes effect after an `apply`, and supplying a non-empty list requires Terraform 1.11 or later. Empty lists are collapsed to `null` before they reach the provider.
+
+Type:
+
+```hcl
+object({
+    authorization_locks                                   = optional(list(string), [])
+    authorization_role_assignments                        = optional(list(string), [])
+    network_dns_forwarding_rulesets                       = optional(list(string), [])
+    network_dns_forwarding_rulesets_forwarding_rules      = optional(list(string), [])
+    network_dns_forwarding_rulesets_virtual_network_links = optional(list(string), [])
+    network_dns_resolvers                                 = optional(list(string), [])
+    network_dns_resolvers_inbound_endpoints               = optional(list(string), [])
+    network_dns_resolvers_outbound_endpoints              = optional(list(string), [])
+  })
+```
+
+Default: `{}`
 
 ### <a name="input_inbound_endpoints"></a> [inbound\_endpoints](#input\_inbound\_endpoints)
 
@@ -206,17 +279,84 @@ map(object({
 
 Default: `{}`
 
+### <a name="input_resource_types"></a> [resource\_types](#input\_resource\_types)
+
+Description: (Optional) The Azure resource type and API version used for each resource created by this module. Each default is the latest GA API version for that type.
+
+- `network_dns_forwarding_rulesets` - (Optional) The type and API version of the DNS forwarding rulesets. Default `Microsoft.Network/dnsForwardingRulesets@2025-05-01`.
+- `network_dns_forwarding_rulesets_forwarding_rules` - (Optional) The type and API version of the forwarding rules. Default `Microsoft.Network/dnsForwardingRulesets/forwardingRules@2025-05-01`.
+- `network_dns_forwarding_rulesets_virtual_network_links` - (Optional) The type and API version of the virtual network links. Default `Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01`.
+- `network_dns_resolvers` - (Optional) The type and API version of the DNS resolver. Default `Microsoft.Network/dnsResolvers@2025-05-01`.
+- `network_dns_resolvers_inbound_endpoints` - (Optional) The type and API version of the inbound endpoints. Default `Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01`.
+- `network_dns_resolvers_outbound_endpoints` - (Optional) The type and API version of the outbound endpoints. Default `Microsoft.Network/dnsResolvers/outboundEndpoints@2025-05-01`.
+- `authorization_locks` - (Optional) The type and API version for resolver and forwarding-ruleset locks. Default `Microsoft.Authorization/locks@2020-05-01`.
+- `authorization_role_assignments` - (Optional) The type and API version for resolver and forwarding-ruleset role assignments. Default `Microsoft.Authorization/roleAssignments@2022-04-01`.
+
+The lock and role assignment request bodies and names are supplied by the `Azure/avm-utl-interfaces/azure` module. Their AzAPI resource types use the configurable fields above.
+
+Type:
+
+```hcl
+object({
+    authorization_locks                                   = optional(string, "Microsoft.Authorization/locks@2020-05-01")
+    authorization_role_assignments                        = optional(string, "Microsoft.Authorization/roleAssignments@2022-04-01")
+    network_dns_forwarding_rulesets                       = optional(string, "Microsoft.Network/dnsForwardingRulesets@2025-05-01")
+    network_dns_forwarding_rulesets_forwarding_rules      = optional(string, "Microsoft.Network/dnsForwardingRulesets/forwardingRules@2025-05-01")
+    network_dns_forwarding_rulesets_virtual_network_links = optional(string, "Microsoft.Network/dnsForwardingRulesets/virtualNetworkLinks@2025-05-01")
+    network_dns_resolvers                                 = optional(string, "Microsoft.Network/dnsResolvers@2025-05-01")
+    network_dns_resolvers_inbound_endpoints               = optional(string, "Microsoft.Network/dnsResolvers/inboundEndpoints@2025-05-01")
+    network_dns_resolvers_outbound_endpoints              = optional(string, "Microsoft.Network/dnsResolvers/outboundEndpoints@2025-05-01")
+  })
+```
+
+Default: `{}`
+
+### <a name="input_retry"></a> [retry](#input\_retry)
+
+Description: (Optional) The retry configuration applied to every `azapi_resource` created by this module.
+
+- `error_message_regex` - (Optional) A list of regular expressions matched against the error message. The request is retried when any of them matches. The AzAPI provider requires this attribute, so it cannot be `null`; pass `[]` to disable retries.
+- `interval_seconds` - (Optional) The base number of seconds to wait between retries. Defaults to the AzAPI provider default (`10`).
+- `max_interval_seconds` - (Optional) The maximum number of seconds to wait between retries. Defaults to the AzAPI provider default (`180`).
+
+The default list covers the transient failures this module's resources actually hit:
+
+- `AnotherOperationInProgress` - a concurrent write against the same virtual network or subnet.
+- `ReferencedResourceNotProvisioned` - the subnet or virtual network is still provisioning.
+- `CannotDeleteResource` - on teardown, ARM still reports a nested resource (an inbound or outbound endpoint, or a forwarding rule) as present after its `DELETE` has already completed. Matches the default of the AVM AzAPI reference module `avm-res-network-privatednszone`.
+- `PrincipalNotFound` - the role assignment principal has not finished propagating through Entra ID. This covers the check that `skip_service_principal_aad_check` used to handle client-side under `hashicorp/azurerm`.
+- `ScopeLocked` - a management lock is still being removed from the scope.
+
+Type:
+
+```hcl
+object({
+    error_message_regex = optional(list(string), [
+      "AnotherOperationInProgress",
+      "ReferencedResourceNotProvisioned",
+      "CannotDeleteResource",
+      "PrincipalNotFound",
+      "ScopeLocked",
+    ])
+    interval_seconds     = optional(number, null)
+    max_interval_seconds = optional(number, null)
+  })
+```
+
+Default: `{}`
+
 ### <a name="input_role_assignments"></a> [role\_assignments](#input\_role\_assignments)
 
-Description:   A map of role assignments to create on the <RESOURCE>. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
+Description:   A map of role assignments to create on the DNS resolver and on each of its forwarding rulesets. The map key is deliberately arbitrary to avoid issues where map keys maybe unknown at plan time.
 
-  - `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal.
-  - `principal_id` - The ID of the principal to assign the role to.
+  - `name` - (Optional) The name (a lowercase GUID) of the role assignment on the DNS resolver. If not set, the module derives a GUID from the resolver, principal, role and delegated identity. An adopted assignment keeps its existing GUID on update. A name that you set is used when the assignment is created or replaced, so set a new name if you replace an assignment with a changed principal and want to pick the name yourself. The assignments on the forwarding rulesets always use a derived GUID.
+  - `role_definition_id_or_name` - The ID or name of the role definition to assign to the principal. Names are resolved at the resource group of the DNS resolver, including resource-group custom roles and inherited roles. Changing the resolved role on an existing assignment replaces it with a new GUID.
+  - `principal_id` - The ID of the principal to assign the role to. Changing it on an existing assignment replaces it with a new GUID.
   - `description` - (Optional) The description of the role assignment.
-  - `skip_service_principal_aad_check` - (Optional) If set to true, skips the Azure Active Directory check for the service principal in the tenant. Defaults to false.
+  - `skip_service_principal_aad_check` - (Optional) Preserves the AzureRM request behavior by setting `principalType` to `ServicePrincipal` when `principal_type` is unset. If `principal_type` is explicitly set, that value takes precedence. A `PrincipalNotFound` error from a not-yet-replicated principal is retried by `var.retry`. Defaults to false.
   - `condition` - (Optional) The condition which will be used to scope the role assignment.
   - `condition_version` - (Optional) The version of the condition syntax. Leave as `null` if you are not using a condition, if you are then valid values are '2.0'.
-  - `delegated_managed_identity_resource_id` - (Optional) The delegated Azure Resource Id which contains a Managed Identity. Changing this forces a new resource to be created. This field is only used in cross-tenant scenario.
+  - `delegated_managed_identity_resource_id` - (Optional) The delegated Azure Resource Id which contains a Managed Identity. This field is only used in cross-tenant scenarios. Changing it on an existing assignment replaces it with a new GUID.
   - `principal_type` - (Optional) The type of the `principal_id`. Possible values are `User`, `Group` and `ServicePrincipal`. It is necessary to explicitly set this attribute when creating role assignments if the principal creating the assignment is constrained by ABAC rules that filters on the PrincipalType attribute.
 
   > Note: only set `skip_service_principal_aad_check` to true if you are assigning a role to a service principal.
@@ -225,6 +365,7 @@ Type:
 
 ```hcl
 map(object({
+    name                                   = optional(string, null)
     role_definition_id_or_name             = string
     principal_id                           = string
     description                            = optional(string, null)
@@ -246,13 +387,39 @@ Type: `map(string)`
 
 Default: `null`
 
+### <a name="input_timeouts"></a> [timeouts](#input\_timeouts)
+
+Description: (Optional) Timeouts for the resource operations. Each value must be a string parsable as a Go duration, for example `"30s"`, `"5m"` or `"1h30m"`.
+
+Any attribute left unset falls back to the timeout default of the `azurerm` resource this module replaced. Every replaced resource -- the six `azurerm_private_dns_resolver*` resources plus `azurerm_management_lock` and `azurerm_role_assignment` -- shared the same defaults: create 30m, read 5m, update 30m, delete 30m. The fallbacks live in `local.timeouts` in `locals.tf`.
+
+Set the whole object to `null` to omit the `timeouts` block entirely and use the AzAPI provider defaults.
+
+- `create` - (Optional) Timeout for create operations.
+- `read` - (Optional) Timeout for read operations.
+- `update` - (Optional) Timeout for update operations.
+- `delete` - (Optional) Timeout for delete operations.
+
+Type:
+
+```hcl
+object({
+    create = optional(string)
+    read   = optional(string)
+    update = optional(string)
+    delete = optional(string)
+  })
+```
+
+Default: `{}`
+
 ## Outputs
 
 The following outputs are exported:
 
 ### <a name="output_forwarding_rulesets"></a> [forwarding\_rulesets](#output\_forwarding\_rulesets)
 
-Description: The forwarding rulesets of the DNS resolver.
+Description: Discrete forwarding ruleset objects, keyed by `"<outbound endpoint key>-<ruleset name>"`, rather than complete provider resource objects.
 
 ### <a name="output_inbound_endpoint_ips"></a> [inbound\_endpoint\_ips](#output\_inbound\_endpoint\_ips)
 
@@ -260,7 +427,7 @@ Description: The IP addresses of the inbound endpoints.
 
 ### <a name="output_inbound_endpoints"></a> [inbound\_endpoints](#output\_inbound\_endpoints)
 
-Description: The inbound endpoints of the DNS resolver.
+Description: Discrete inbound endpoint objects, keyed by endpoint key, with the original ip\_configurations list and flattened subnet\_id, private\_ip\_address and private\_ip\_allocation\_method fields.
 
 ### <a name="output_name"></a> [name](#output\_name)
 
@@ -268,11 +435,11 @@ Description: The name of the DNS resolver.
 
 ### <a name="output_outbound_endpoints"></a> [outbound\_endpoints](#output\_outbound\_endpoints)
 
-Description: The outbound endpoints of the DNS resolver.
+Description: Discrete outbound endpoint objects, keyed by endpoint key, rather than complete provider resource objects.
 
 ### <a name="output_resource"></a> [resource](#output\_resource)
 
-Description: This is the full output for the resource.
+Description: A discrete DNS resolver object containing id, name, location, resource\_group\_name, tags, virtual\_network\_id and exported state fields, rather than the complete provider resource object.
 
 ### <a name="output_resource_id"></a> [resource\_id](#output\_resource\_id)
 
@@ -280,7 +447,13 @@ Description: The ID of the DNS resolver.
 
 ## Modules
 
-No modules.
+The following Modules are called:
+
+### <a name="module_interfaces"></a> [interfaces](#module\_interfaces)
+
+Source: Azure/avm-utl-interfaces/azure
+
+Version: 0.9.0
 
 <!-- markdownlint-disable-next-line MD041 -->
 ## Data Collection
