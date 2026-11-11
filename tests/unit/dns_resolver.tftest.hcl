@@ -1,35 +1,71 @@
-mock_provider "azurerm" {
-  mock_resource "azurerm_private_dns_resolver" {
-    defaults = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsResolvers/test"
-    }
-  }
-  mock_resource "azurerm_private_dns_resolver_outbound_endpoint" {
-    defaults = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsResolvers/test/outboundEndpoints/outbound"
-    }
-  }
-  mock_resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" {
-    defaults = {
-      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset"
-    }
-  }
-}
-
 mock_provider "azapi" {
   mock_data "azapi_client_config" {
     defaults = {
+      subscription_id          = "00000000-0000-0000-0000-000000000000"
       subscription_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000"
+      tenant_id                = "00000000-0000-0000-0000-000000000001"
     }
   }
 }
 
+mock_provider "random" {}
+
 mock_provider "terraform" {}
+
+override_resource {
+  target = azapi_resource.this
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsResolvers/test"
+  }
+}
+
+override_resource {
+  target = azapi_resource.outbound_endpoint
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsResolvers/test/outboundEndpoints/outbound"
+  }
+}
+
+override_resource {
+  target = azapi_resource.inbound_endpoint
+  values = {
+    output = {
+      properties = {
+        ipConfigurations = [{
+          privateIpAddress          = "10.0.0.4"
+          privateIpAllocationMethod = "Static"
+          subnet = {
+            id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test/subnets/inbound"
+          }
+        }]
+      }
+    }
+  }
+}
+
+override_resource {
+  target = azapi_resource.forwarding_ruleset
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset"
+  }
+}
+
+override_data {
+  target = module.interfaces.data.azapi_resource_list.role_definitions[0]
+  values = {
+    output = {
+      results = [{
+        id        = "/subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
+        role_name = "Reader"
+      }]
+    }
+  }
+}
 
 variables {
   location                    = "northeurope"
   name                        = "test"
-  resource_group_name         = "test"
+  parent_id                   = "/subscriptions/00000000-0000-0000-0000-000000000003/resourceGroups/explicit-scope"
   virtual_network_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test"
   enable_telemetry            = false
 }
@@ -38,21 +74,25 @@ run "defaults" {
   command = apply
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
   assert {
-    condition     = output.name == "test" && output.resource_id == azurerm_private_dns_resolver.this.id
+    condition     = output.name == "test" && output.resource_id == azapi_resource.this.id
     error_message = "The resolver name and resource ID must be returned."
+  }
+  assert {
+    condition     = azapi_resource.this.parent_id == var.parent_id && output.resource.resource_group_name == "explicit-scope"
+    error_message = "The resolver must use the caller's known parent ID and preserve its resource-group-name output."
   }
   assert {
     condition     = length(output.inbound_endpoints) == 0 && length(output.outbound_endpoints) == 0 && length(output.forwarding_rulesets) == 0
     error_message = "Optional endpoints and rulesets must be absent by default."
   }
   assert {
-    condition     = length(azapi_resource.telemetry) == 0 && length(terraform_data.telemetry) == 0 && length(data.azapi_client_config.telemetry) == 0 && length(azurerm_management_lock.this) == 0 && length(azurerm_role_assignment.dnsresolver) == 0
+    condition     = length(azapi_resource.telemetry) == 0 && length(terraform_data.telemetry) == 0 && length(data.azapi_client_config.telemetry) == 0 && length(azapi_resource.lock) == 0 && length(azapi_resource.role_assignments) == 0
     error_message = "Disabled telemetry and unconfigured locks and assignments must not create resources."
   }
 }
@@ -61,8 +101,8 @@ run "telemetry_enabled" {
   command = apply
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
@@ -80,8 +120,8 @@ run "endpoints_rules_and_links" {
   command = apply
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
@@ -121,15 +161,19 @@ run "endpoints_rules_and_links" {
   }
 
   assert {
-    condition     = output.inbound_endpoint_ips["inbound"] == "10.0.0.4" && output.inbound_endpoints["inbound"].tags == tomap({ environment = "test", endpoint = "inbound" })
+    condition     = azapi_resource.inbound_endpoint["inbound"].body.properties.ipConfigurations[0].privateIpAddress == "10.0.0.4" && azapi_resource.inbound_endpoint["inbound"].tags == tomap({ environment = "test", endpoint = "inbound" })
     error_message = "The static inbound address and merged endpoint tags must be preserved."
   }
   assert {
-    condition     = azurerm_private_dns_resolver_forwarding_rule.this["outbound-ruleset-example"].domain_name == "example.com." && !azurerm_private_dns_resolver_forwarding_rule.this["outbound-ruleset-example"].enabled
+    condition     = output.inbound_endpoints["inbound"].ip_configurations[0].private_ip_address == "10.0.0.4" && output.inbound_endpoints["inbound"].ip_configurations[0].private_ip_allocation_method == "Static" && output.inbound_endpoints["inbound"].ip_configurations[0].subnet_id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/virtualNetworks/test/subnets/inbound"
+    error_message = "Inbound endpoint outputs must retain the nested ip_configurations shape."
+  }
+  assert {
+    condition     = azapi_resource.forwarding_rule["outbound-ruleset-example"].body.properties.domainName == "example.com." && azapi_resource.forwarding_rule["outbound-ruleset-example"].body.properties.forwardingRuleState == "Disabled"
     error_message = "Forwarding rules must retain their domain and enabled setting."
   }
   assert {
-    condition     = length(azurerm_private_dns_resolver_virtual_network_link.default) == 1 && azurerm_private_dns_resolver_virtual_network_link.additional["outbound-ruleset-spoke"].metadata["purpose"] == "spoke"
+    condition     = length(azapi_resource.virtual_network_link_default) == 1 && azapi_resource.virtual_network_link_additional["outbound-ruleset-spoke"].body.properties.metadata["purpose"] == "spoke"
     error_message = "Default and additional virtual network links must be created with their metadata."
   }
 }
@@ -138,8 +182,8 @@ run "optional_rules" {
   command = apply
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
@@ -155,7 +199,7 @@ run "optional_rules" {
   }
 
   assert {
-    condition     = length(output.forwarding_rulesets) == 1 && length(azurerm_private_dns_resolver_forwarding_rule.this) == 0
+    condition     = length(output.forwarding_rulesets) == 1 && length(azapi_resource.forwarding_rule) == 0
     error_message = "A forwarding ruleset must support omitting its optional rules."
   }
 }
@@ -164,13 +208,21 @@ run "locks_and_role_assignments" {
   command = apply
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
   variables {
+    ignore_body_changes = {
+      authorization_locks            = ["properties.notes"]
+      authorization_role_assignments = ["properties.description"]
+    }
     lock = { kind = "CanNotDelete" }
+    resource_types = {
+      authorization_locks            = "Microsoft.Authorization/locks@2016-09-01"
+      authorization_role_assignments = "Microsoft.Authorization/roleAssignments@2020-04-01-preview"
+    }
     role_assignments = {
       reader = {
         role_definition_id_or_name = "Reader"
@@ -193,15 +245,23 @@ run "locks_and_role_assignments" {
   }
 
   assert {
-    condition     = azurerm_management_lock.this[0].scope == output.resource_id && length(azurerm_management_lock.rulesets) == 1
+    condition     = azapi_resource.lock[0].parent_id == output.resource_id && length(azapi_resource.lock_rulesets) == 1
     error_message = "Locks must protect the resolver and its forwarding rulesets."
   }
   assert {
-    condition     = azurerm_role_assignment.dnsresolver["reader"].description == "DNS reader" && azurerm_role_assignment.dnsresolver["reader"].principal_type == "ServicePrincipal"
+    condition     = azapi_resource.lock[0].type == "Microsoft.Authorization/locks@2016-09-01" && azapi_resource.lock_rulesets["outbound-ruleset"].type == "Microsoft.Authorization/locks@2016-09-01"
+    error_message = "Resolver and ruleset locks must use the configured lock API version."
+  }
+  assert {
+    condition     = azapi_resource.role_assignments["reader"].type == "Microsoft.Authorization/roleAssignments@2020-04-01-preview" && azapi_resource.role_assignments_rulesets["0"].type == "Microsoft.Authorization/roleAssignments@2020-04-01-preview"
+    error_message = "Resolver and ruleset role assignments must use the configured role-assignment API version."
+  }
+  assert {
+    condition     = azapi_resource.role_assignments["reader"].body.properties.description == "DNS reader" && azapi_resource.role_assignments["reader"].body.properties.principalType == "ServicePrincipal"
     error_message = "Resolver role assignments must retain their description and principal type."
   }
   assert {
-    condition     = length(azurerm_role_assignment.rulesets) == 1 && azurerm_role_assignment.rulesets["0"].role_definition_name == "Reader" && azurerm_role_assignment.rulesets["0"].principal_type == "ServicePrincipal"
+    condition     = length(azapi_resource.role_assignments_rulesets) == 1 && endswith(azapi_resource.role_assignments_rulesets["0"].body.properties.roleDefinitionId, "acdd72a7-3385-48ef-bd42-f606fba81ae7") && azapi_resource.role_assignments_rulesets["0"].body.properties.principalType == "ServicePrincipal"
     error_message = "The existing ruleset assignment address and role must be preserved."
   }
 }
@@ -210,8 +270,8 @@ run "invalid_lock" {
   command = plan
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 
@@ -222,12 +282,27 @@ run "invalid_lock" {
   expect_failures = [var.lock]
 }
 
+run "invalid_parent_id" {
+  command = plan
+
+  variables {
+    parent_id = "not-a-resource-id"
+  }
+
+  expect_failures = [var.parent_id]
+  providers = {
+    azapi     = azapi
+    random    = random
+    terraform = terraform
+  }
+}
+
 run "invalid_name" {
   command = plan
 
   providers = {
-    azurerm   = azurerm
     azapi     = azapi
+    random    = random
     terraform = terraform
   }
 

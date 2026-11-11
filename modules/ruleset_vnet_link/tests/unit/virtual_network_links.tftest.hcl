@@ -1,4 +1,3 @@
-mock_provider "azurerm" {}
 mock_provider "azapi" {
   mock_data "azapi_client_config" {
     defaults = {
@@ -7,6 +6,13 @@ mock_provider "azapi" {
   }
 }
 mock_provider "terraform" {}
+
+override_resource {
+  target = azapi_resource.this
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset/virtualNetworkLinks/link"
+  }
+}
 
 variables {
   dns_forwarding_ruleset_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/test/providers/Microsoft.Network/dnsForwardingRulesets/ruleset"
@@ -22,30 +28,18 @@ variables {
 run "virtual_network_links" {
   command = apply
 
-  providers = {
-    azurerm   = azurerm
-    azapi     = azapi
-    terraform = terraform
-  }
-
   assert {
-    condition     = azurerm_private_dns_resolver_virtual_network_link.this["spoke"].dns_forwarding_ruleset_id == var.dns_forwarding_ruleset_id && azurerm_private_dns_resolver_virtual_network_link.this["spoke"].virtual_network_id == var.virtual_networks["spoke"].vnet_id
+    condition     = azapi_resource.this["spoke"].parent_id == var.dns_forwarding_ruleset_id && azapi_resource.this["spoke"].body.properties.virtualNetwork.id == var.virtual_networks["spoke"].vnet_id
     error_message = "Each virtual network link must target the supplied ruleset and virtual network."
   }
   assert {
-    condition     = azurerm_private_dns_resolver_virtual_network_link.this["spoke"].metadata["purpose"] == "spoke"
+    condition     = azapi_resource.this["spoke"].body.properties.metadata["purpose"] == "spoke"
     error_message = "Virtual network link metadata must be preserved."
   }
 }
 
 run "invalid_ruleset_id" {
   command = plan
-
-  providers = {
-    azurerm   = azurerm
-    azapi     = azapi
-    terraform = terraform
-  }
 
   variables {
     dns_forwarding_ruleset_id = "not-a-resource-id"
@@ -57,12 +51,6 @@ run "invalid_ruleset_id" {
 run "direct_child_vnet2_output" {
   command = apply
 
-  providers = {
-    azurerm   = azurerm
-    azapi     = azapi
-    terraform = terraform
-  }
-
   variables {
     virtual_networks = {
       vnet2 = {
@@ -73,19 +61,13 @@ run "direct_child_vnet2_output" {
   }
 
   assert {
-    condition     = output.resource_id["vnet2"] == azurerm_private_dns_resolver_virtual_network_link.this["vnet2"].id && azurerm_private_dns_resolver_virtual_network_link.this["vnet2"].dns_forwarding_ruleset_id == var.dns_forwarding_ruleset_id && azurerm_private_dns_resolver_virtual_network_link.this["vnet2"].virtual_network_id == var.virtual_networks["vnet2"].vnet_id && azurerm_private_dns_resolver_virtual_network_link.this["vnet2"].metadata == var.virtual_networks["vnet2"].metadata
+    condition     = output.resource_id["vnet2"] == azapi_resource.this["vnet2"].id && azapi_resource.this["vnet2"].parent_id == var.dns_forwarding_ruleset_id && azapi_resource.this["vnet2"].body.properties.virtualNetwork.id == var.virtual_networks["vnet2"].vnet_id && azapi_resource.this["vnet2"].body.properties.metadata == var.virtual_networks["vnet2"].metadata
     error_message = "The direct child link must expose vnet2 and retain its ruleset, virtual network, and metadata."
   }
 }
 
 run "telemetry_enabled" {
   command = apply
-
-  providers = {
-    azurerm   = azurerm
-    azapi     = azapi
-    terraform = terraform
-  }
 
   variables {
     enable_telemetry = true
@@ -99,12 +81,6 @@ run "telemetry_enabled" {
 
 run "telemetry_disabled" {
   command = apply
-
-  providers = {
-    azurerm   = azurerm
-    azapi     = azapi
-    terraform = terraform
-  }
 
   variables {
     enable_telemetry = false
