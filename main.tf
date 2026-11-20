@@ -311,7 +311,7 @@ resource "azapi_resource" "lock" {
 }
 
 resource "azapi_resource" "lock_rulesets" {
-  for_each = { for key, ruleset in azapi_resource.forwarding_ruleset : key => ruleset if var.lock != null }
+  for_each = var.lock != null ? azapi_resource.forwarding_ruleset : {}
 
   name                   = coalesce(module.interfaces.lock_azapi.name, "lock-${each.key}")
   parent_id              = each.value.id
