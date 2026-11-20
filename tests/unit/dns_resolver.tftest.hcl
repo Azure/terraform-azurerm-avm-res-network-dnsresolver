@@ -312,3 +312,40 @@ run "invalid_name" {
 
   expect_failures = [var.name]
 }
+
+run "ruleset_without_lock" {
+  command = plan
+
+  providers = {
+    azapi     = azapi
+    random    = random
+    terraform = terraform
+  }
+
+  variables {
+    lock = null
+
+    outbound_endpoints = {
+      outbound = {
+        subnet_name = "outbound"
+
+        forwarding_ruleset = {
+          first = {
+            name  = "ruleset"
+            rules = {}
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = length(azapi_resource.forwarding_ruleset) == 1
+    error_message = "Expected one forwarding ruleset."
+  }
+
+  assert {
+    condition     = length(azapi_resource.lock_rulesets) == 0
+    error_message = "No ruleset locks should exist when lock is null."
+  }
+}
